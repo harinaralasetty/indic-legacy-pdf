@@ -982,22 +982,58 @@ def _show_recovery_warnings(warnings: list[dict]) -> None:
         )
 
 
-def _atomic_text(path: Path, text: str) -> None:
+def _atomic_text_outputs(outputs: dict[Path, str]) -> None:
+    """Stage every output, then replace; roll back earlier replacements on error.
+
+    Each rename is atomic. Filesystems cannot atomically rename two paths as a
+    transaction; backups protect against ordinary synchronous write failures.
+    """
     import os
     import tempfile
 
-    temporary = None
+    staged: dict[Path, Path] = {}
+    backups: dict[Path, Path] = {}
+    replaced: list[Path] = []
     try:
-        with tempfile.NamedTemporaryFile(
-            mode="w", encoding="utf-8", dir=path.parent, delete=False
-        ) as handle:
-            temporary = Path(handle.name)
-            handle.write(text)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, path)
+        for path, text in outputs.items():
+            with tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", dir=path.parent, delete=False
+            ) as handle:
+                staged[path] = Path(handle.name)
+                handle.write(text)
+                handle.flush()
+                os.fsync(handle.fileno())
+            if path.exists() or path.is_symlink():
+                # A hard link preserves the original inode, bytes and metadata,
+                # including a symlink itself rather than its target.
+                fd, name = tempfile.mkstemp(dir=path.parent)
+                os.close(fd)
+                backup = Path(name)
+                backup.unlink()
+                os.link(path, backup, follow_symlinks=False)
+                backups[path] = backup
+        try:
+            for path, temporary in staged.items():
+                os.replace(temporary, path)
+                replaced.append(path)
+        except OSError as exc:
+            failures = []
+            for path in reversed(replaced):
+                try:
+                    if path in backups:
+                        os.replace(backups[path], path)
+                    else:
+                        path.unlink()
+                except OSError as rollback_error:
+                    failures.append(f"{path}: {rollback_error}; original at {backups.get(path)}")
+                    backups.pop(path, None)  # Keep the backup for manual restoration.
+            if failures:
+                raise OSError(
+                    f"Output replacement failed: {exc}; rollback failed: {'; '.join(failures)}"
+                ) from exc
+            raise OSError(f"Output replacement failed; original outputs restored: {exc}") from exc
     finally:
-        if temporary is not None:
+        for temporary in (*staged.values(), *backups.values()):
             temporary.unlink(missing_ok=True)
 
 
@@ -1029,6 +1065,10 @@ def recover_text(input_file: Path, output: Path, report_path: Path | None, stric
                         "Input, output and report paths must be different (including inode aliases)."
                     )
         for path in (output, report_path):
+            if not path.parent.is_dir():
+                raise ValueError(f"Destination directory does not exist: {path.parent}")
+            if path.exists() and not path.is_file():
+                raise ValueError(f"Destination is not a regular file: {path}")
             if path.exists():
                 with path.open("rb") as handle:
                     if b"%PDF-" in handle.read(1024):
@@ -1037,8 +1077,12 @@ def recover_text(input_file: Path, output: Path, report_path: Path | None, stric
                         )
         recovered = recover_pdf(input_file, strict_cmap=strict_cmap)
         _show_recovery_warnings(recovered.warnings)
-        _atomic_text(output, recovered.text)
-        _atomic_text(report_path, json.dumps(recovered.report, ensure_ascii=False, indent=2) + "\n")
+        _atomic_text_outputs(
+            {
+                output: recovered.text,
+                report_path: json.dumps(recovered.report, ensure_ascii=False, indent=2) + "\n",
+            }
+        )
     except (ImportError, ValueError, OSError, RuntimeError) as exc:
         raise click.ClickException(str(exc)) from exc
     report = recovered.report

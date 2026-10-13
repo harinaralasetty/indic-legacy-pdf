@@ -211,6 +211,7 @@ class _Budget:
 
 
 _TELUGU_FONT_CACHE: dict[str, bool] = {}
+_TELUGU_FONT_CACHE_LOCK = threading.Lock()
 FONT_VERDICT_CACHE_LIMIT = 128
 VERIFICATION_NOTE = (
     "round-trip = internal consistency of reading order/whitespace/ambiguity; "
@@ -267,8 +268,9 @@ def _is_telugu_font(font_bytes: bytes) -> bool:
         # Even a cached verdict must not bypass the optional-dependency guard.
         return False
     digest = hashlib.sha256(font_bytes).hexdigest()
-    if digest in _TELUGU_FONT_CACHE:
-        return _TELUGU_FONT_CACHE[digest]
+    with _TELUGU_FONT_CACHE_LOCK:
+        if digest in _TELUGU_FONT_CACHE:
+            return _TELUGU_FONT_CACHE[digest]
     verified = False
     try:
         with TTFont(io.BytesIO(font_bytes), lazy=True) as font:
@@ -293,9 +295,11 @@ def _is_telugu_font(font_bytes: bytes) -> bool:
     except Exception:
         # Malformed/unsupported programs cannot establish Telugu support.
         verified = False
-    if len(_TELUGU_FONT_CACHE) >= FONT_VERDICT_CACHE_LIMIT:
-        _TELUGU_FONT_CACHE.pop(next(iter(_TELUGU_FONT_CACHE)))
-    _TELUGU_FONT_CACHE[digest] = verified
+    with _TELUGU_FONT_CACHE_LOCK:
+        if digest not in _TELUGU_FONT_CACHE:
+            while len(_TELUGU_FONT_CACHE) >= FONT_VERDICT_CACHE_LIMIT:
+                _TELUGU_FONT_CACHE.pop(next(iter(_TELUGU_FONT_CACHE)))
+            _TELUGU_FONT_CACHE[digest] = verified
     return verified
 
 
@@ -1274,15 +1278,62 @@ def _positioned_runs(
 
 def _lines(spans: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
     """Approximate reading order: baseline rows top-to-bottom, x left-to-right."""
-    lines: list[list[dict[str, Any]]] = []
-    for span in sorted(spans, key=lambda s: (s["y"], s["x"])):
-        if lines and abs(lines[-1][0]["y"] - span["y"]) <= max(2, span["size"] * 0.3):
-            lines[-1].append(span)
+    rows: list[list[list[dict[str, Any]]]] = []
+    # Trace fragments are not independent words: a positioned mark can move
+    # left of the preceding glyph. Assemble spatially contiguous content-order
+    # runs first, then sort ONLY those runs for reading order.
+    runs: list[list[dict[str, Any]]] = []
+    for span in spans:
+        previous = runs[-1][-1] if runs else None
+        if (
+            previous is not None
+            and span["xref"] == previous["xref"]
+            and span["font_name"] == previous["font_name"]
+            and abs(span["y"] - previous["y"]) <= max(2, span["size"] * 0.3)
+            and previous["x"] - span["size"] <= span["x"]
+            and span["x"] <= previous["end"] + span["size"] * COLUMN_GAP_EM
+        ):
+            runs[-1].append(span)
         else:
-            lines.append([span])
-    for line in lines:
-        line.sort(key=lambda s: s["x"])
-    return lines
+            runs.append([span])
+    ordered = sorted(runs, key=lambda run: (run[0]["y"], min(s["x"] for s in run)))
+    for run in ordered:
+        span = run[0]
+        if rows and abs(rows[-1][0][0]["y"] - span["y"]) <= max(2, span["size"] * 0.3):
+            rows[-1].append(run)
+        else:
+            rows.append([run])
+    return [
+        [span for run in sorted(row, key=lambda r: min(s["x"] for s in r)) for span in run]
+        for row in rows
+    ]
+
+
+def _shaped_steps(decoded: DecodeResult, mapping: GlyphMap, span: dict[str, Any]) -> list[float]:
+    """Expected origin deltas from candidate shaping, including GPOS offsets.
+
+    PDF widths remain authoritative when a producer deliberately overrides the
+    font metrics. The shaping correction is relative to nominal font advances;
+    this also supports older PDFs that use a constant DW for all glyphs.
+    """
+    hb, _ = _dependencies()
+    font = mapping._font
+    upem = font.face.upem
+    offsets = [0.0] * len(span["gids"])
+    advances = list(span["widths"])
+    for start, end, text in decoded.clusters:
+        buf = hb.Buffer()
+        buf.add_str(text)
+        buf.guess_segment_properties()
+        hb.shape(font, buf)
+        if tuple(g.codepoint for g in buf.glyph_infos) != tuple(span["gids"][start:end]):
+            continue
+        for i, pos in enumerate(buf.glyph_positions, start):
+            scale = span["sizes"][i] / upem
+            nominal = font.get_glyph_h_advance(span["gids"][i])
+            offsets[i] = pos.x_offset * scale
+            advances[i] += (pos.x_advance - nominal) * scale
+    return [advances[i] + offsets[i + 1] - offsets[i] for i in range(len(advances) - 1)]
 
 
 def recover_pdf(
@@ -1395,6 +1446,7 @@ def recover_pdf(
                             )
                         inferred.update(used)
                         warnings.extend(decoded.warnings)
+                        expected_steps = _shaped_steps(decoded, mapping, span)
                         cluster_parts = []
                         for start, _end, text in decoded.clusters:
                             if (
@@ -1406,7 +1458,7 @@ def recover_pdf(
                                 gap = (
                                     origins[start]
                                     - origins[start - 1]
-                                    - span["widths"][start - 1]
+                                    - expected_steps[start - 1]
                                     - span["tracking"][start - 1]
                                 )
                                 size = span["sizes"][start - 1]
