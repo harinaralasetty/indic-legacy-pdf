@@ -140,3 +140,30 @@ class TestCLIApiCommand:
         assert result.exit_code == 0
         assert "--port" in result.output
         assert "--host" in result.output
+
+
+@pytest.mark.parametrize("missing", ["uharfbuzz", "fontTools"])
+def test_glyph_optional_dependency_guard(tmp_path, missing):
+    """Core imports and detection work; recovery explains the missing extra."""
+    import fitz
+
+    pdf = tmp_path / "empty.pdf"
+    with fitz.open() as doc:
+        doc.new_page()
+        doc.save(pdf)
+    code = textwrap.dedent(f"""\
+        import sys
+        sys.modules[{missing!r}] = None
+        import legacylipi
+        from legacylipi.core.glyph_recovery import find_glyph_id_fonts
+        assert find_glyph_id_fonts({str(pdf)!r}) == []
+        from legacylipi.cli import main
+        from click.testing import CliRunner
+        result = CliRunner().invoke(main, ['recover-text', {str(pdf)!r}, '-o', {str(tmp_path / "out.txt")!r}])
+        assert result.exit_code != 0
+        assert 'legacylipi[glyph]' in result.output, result.output
+    """)
+    result = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, timeout=20
+    )
+    assert result.returncode == 0, result.stderr

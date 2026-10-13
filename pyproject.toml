@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "legacylipi"
-version = "1.0.2"
+version = "1.1.0"
 description = "Legacy Font PDF Translator - Translate PDFs with legacy Indian font encodings to English"
 readme = "README.md"
 license = "MIT"
@@ -41,6 +41,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "fonttools>=4.66.1",
+    "uharfbuzz>=0.56.3",
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
     "pytest-asyncio>=0.21.0",
@@ -58,6 +60,10 @@ openai = [
 ]
 vision = [
     "google-cloud-vision>=3.5.0",
+]
+glyph = [
+    "fonttools>=4.66.1",
+    "uharfbuzz>=0.56.3",
 ]
 
 [project.scripts]

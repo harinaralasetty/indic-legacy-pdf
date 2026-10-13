@@ -112,6 +112,26 @@ legacylipi detect input.pdf
 
 See [docs/cli-reference.md](docs/cli-reference.md) for complete CLI documentation.
 
+## Telugu glyph-ID text recovery
+
+For embedded Telugu fonts whose PDF omits `/ToUnicode`, use reverse shaping:
+
+```bash
+uv sync --extra glyph
+uv run legacylipi recover-text INPUT.pdf -o OUT.txt --report REPORT.json
+```
+
+`detect` flags `glyph-id` only when fontTools verifies Telugu support and page
+text uses those fonts; existing legacy font-name detection takes precedence.
+Recovery reports unknown glyphs, collisions, cmap repairs and per-page reshaping
+checks. Round-trip = internal consistency of reading order/whitespace/ambiguity;
+it does NOT verify that inferred cmap mappings are correct. Shaping builds the
+map and also checks it. Inferred entries are listed in the report and were
+spot-checked visually against page renders for the Gautami sample only.
+The JSON `verification_note` and CLI footer explain this limit; inserted layout
+whitespace and order between runs are not checked.
+See [glyph recovery and its limits](docs/glyph-recovery.md).
+
 ## Web UI
 
 LegacyLipi includes a modern React-based web interface backed by a FastAPI REST API.

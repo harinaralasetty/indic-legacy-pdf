@@ -1,6 +1,7 @@
 """Tests for GCP Cloud Translation backend and usage tracking."""
 
 from datetime import datetime
+from functools import partial
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -12,6 +13,15 @@ from legacylipi.core.translator import (
     create_translator,
 )
 from legacylipi.core.utils.usage_tracker import UsageTracker
+
+
+@pytest.fixture(autouse=True)
+def isolate_backend_usage(tmp_path, monkeypatch):
+    """Backend constructors must not create or modify the user's real usage file."""
+    monkeypatch.setattr(
+        "legacylipi.core.translator.UsageTracker",
+        partial(UsageTracker, storage_path=tmp_path / "backend-usage.json"),
+    )
 
 
 class TestUsageTracker:

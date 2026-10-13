@@ -438,14 +438,32 @@ class EncodingDetector:
         total_confidence = 0.0
         result_count = 0
 
-        # First try document-level font detection
-        if document.fonts:
-            doc_font_result = self.detect_from_fonts(document.fonts)
+        # Preserve existing legacy-font detection before considering glyph IDs.
+        # Check every font so an earlier Unicode font cannot mask a legacy match.
+        for font in document.fonts:
+            doc_font_result = self.detect_from_font_name(font.name)
             if doc_font_result and doc_font_result.is_legacy:
-                # High confidence from document fonts
                 for page in document.pages:
                     page_results[page.page_number] = doc_font_result
                 return doc_font_result, page_results
+
+        # Glyph-ID wins over text heuristics only on pages with nonempty text
+        # operands carried by Telugu-verified candidate fonts, never mere font
+        # resources. With no legacy-font match above, any such page sets the
+        # document result; only those pages receive the glyph-ID page result.
+        if document.filepath.is_file():
+            from legacylipi.core.glyph_recovery import find_glyph_id_fonts
+
+            candidates = find_glyph_id_fonts(document.filepath)
+            if candidates:
+                result = EncodingDetectionResult(
+                    detected_encoding="glyph-id",
+                    confidence=1.0,
+                    method=DetectionMethod.FONT_MATCH,
+                    font_name=", ".join(font.base_font_name for font in candidates),
+                )
+                affected = {page for font in candidates for page in font.pages}
+                return result, dict.fromkeys(sorted(affected), result)
 
         # Analyze each page
         for page in document.pages:

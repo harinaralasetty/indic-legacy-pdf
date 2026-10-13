@@ -872,7 +872,12 @@ def detect(input_file: Path, verbose: bool):
         )
         console.print(f"   Method: {encoding_result.method.value}")
 
-        if encoding_result.is_unicode:
+        if encoding_result.detected_encoding == "glyph-id":
+            console.print(
+                "\n[yellow]Embedded font has glyph IDs but no ToUnicode mapping.[/yellow]"
+            )
+            console.print(f"   Use: legacylipi recover-text {input_file.name} -o recovered.txt")
+        elif encoding_result.is_unicode:
             console.print("\n[green]✓ Document is already in Unicode format.[/green]")
         elif encoding_result.is_legacy:
             console.print("\n[yellow]⚠ Legacy encoding detected.[/yellow]")
@@ -910,6 +915,50 @@ def detect(input_file: Path, verbose: bool):
     except Exception as e:
         print_error(str(e))
         sys.exit(1)
+
+
+@main.command("recover-text")
+@click.argument("input_file", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("-o", "--output", required=True, type=click.Path(dir_okay=False, path_type=Path))
+@click.option("--report", "report_path", type=click.Path(dir_okay=False, path_type=Path))
+def recover_text(input_file: Path, output: Path, report_path: Path | None):
+    """Recover Telugu Unicode from embedded glyph-ID fonts without ToUnicode.
+
+    Writes a JSON report beside OUTPUT unless --report selects another path.
+    """
+    import json
+
+    from legacylipi.core.glyph_recovery import recover_pdf
+
+    report_path = report_path or output.with_suffix(".report.json")
+    paths = [input_file.resolve(), output.resolve(), report_path.resolve()]
+    if len(set(paths)) != 3:
+        raise click.ClickException("Input, output and report paths must be different.")
+    try:
+        recovered = recover_pdf(input_file)
+        output.write_text(recovered.text, encoding="utf-8")
+        report_path.write_text(
+            json.dumps(recovered.report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+    except (ImportError, ValueError, OSError, RuntimeError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    report = recovered.report
+    table = Table(title="Glyph-ID recovery")
+    table.add_column("Metric")
+    table.add_column("Result", justify="right")
+    for label, value in (
+        ("Fonts found", str(len(report["fonts"]))),
+        ("Glyph coverage", f"{report['glyph_coverage']:.2%}"),
+        ("Round-trip match", f"{report['roundtrip_match_ratio']:.2%}"),
+        ("Unknown glyphs", str(report["unknown_count"])),
+        ("Collisions", str(report["collisions"])),
+        ("Inferred cmap entries", str(report["inferred_cmap_entries"])),
+        ("Well-formedness", f"{report['well_formedness_ratio']:.2%}"),
+    ):
+        table.add_row(label, value)
+    console.print(table)
+    console.print(report["verification_note"], markup=False)
+    console.print(f"Text: {output}\nReport: {report_path}", markup=False)
 
 
 @main.command("scan-copy")
