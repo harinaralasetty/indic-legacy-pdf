@@ -97,6 +97,7 @@ def ui():
     default=None,
     help="Force specific encoding (e.g., shree-lipi, kruti-dev).",
 )
+@click.option("--source-lang", default=None, help="Source language code (default: from encoding).")
 @click.option(
     "--target-lang",
     type=str,
@@ -169,7 +170,7 @@ def ui():
 @click.option(
     "--structure-preserving",
     is_flag=True,
-    help="Preserve original text positions in PDF output (requires OCR mode and PDF format).",
+    help="Preserve original text positions in PDF output (requires positioned text blocks).",
 )
 @click.option(
     "--bilingual",
@@ -181,6 +182,7 @@ def translate(
     output: Path | None,
     output_format: str,
     encoding: str | None,
+    source_lang: str | None,
     target_lang: str,
     translator: str,
     model: str | None,
@@ -323,8 +325,9 @@ def translate(
                 # Step 3: Convert to Unicode
                 progress.update(task, description="Converting to Unicode...")
                 converter = UnicodeConverter()
-                converted_doc = converter.convert_document(
+                converted_doc = converter.convert_with_recovery(
                     document,
+                    encoding_result,
                     page_encodings=page_encodings,
                 )
                 progress.update(task, description="[green]✓[/green] Converted to Unicode")
@@ -355,42 +358,62 @@ def translate(
 
                 page_texts = [page.unicode_text for page in converted_doc.pages]
                 detected_encoding = encoding_result.detected_encoding
-                source_lang_code = get_source_language(detected_encoding)
+                source_lang_code = source_lang or get_source_language(detected_encoding)
 
                 import asyncio
 
-                translated_pages = asyncio.run(
-                    engine.translate_pages_async(
-                        page_texts,
-                        source_lang=source_lang_code,
-                        target_lang=target_lang,
+                if structure_preserving and fmt == OutputFormat.PDF and not bilingual:
+                    blocks = [
+                        block
+                        for page in converted_doc.pages
+                        for block in page.text_blocks
+                        if block.position is not None
+                    ]
+                    if blocks:
+                        asyncio.run(
+                            engine.translate_blocks_async(
+                                blocks,
+                                source_lang=source_lang_code,
+                                target_lang=target_lang,
+                            )
+                        )
+                    else:
+                        structure_preserving = False
+                else:
+                    structure_preserving = False
+
+                if not structure_preserving:
+                    translated_pages = asyncio.run(
+                        engine.translate_pages_async(
+                            page_texts,
+                            source_lang=source_lang_code,
+                            target_lang=target_lang,
+                        )
                     )
-                )
 
-                # Reassemble with page markers for output generation
-                text_parts = []
-                for i, translated_page in enumerate(translated_pages, 1):
-                    text_parts.append(f"--- Page {i} ---\n{translated_page}")
-                translated_text = "\n\n".join(text_parts)
+                    # Reassemble with page markers for output generation
+                    text_parts = []
+                    for i, translated_page in enumerate(translated_pages, 1):
+                        text_parts.append(f"--- Page {i} ---\n{translated_page}")
+                    translated_text = "\n\n".join(text_parts)
 
-                # Create TranslationResult from the per-page translations
-                from legacylipi.core.models import TranslationResult
+                    # Create TranslationResult from the per-page translations
+                    from legacylipi.core.models import TranslationResult
 
-                unicode_text = "\n\n".join(
-                    f"--- Page {i} ---\n{page.unicode_text}"
-                    for i, page in enumerate(converted_doc.pages, 1)
-                )
-                translation_result = TranslationResult(
-                    source_text=unicode_text,
-                    translated_text=translated_text,
-                    source_language=source_lang_code,
-                    target_language=target_lang,
-                    translation_backend=engine.backend_type,
-                    chunk_count=len(translated_pages),
-                )
-
+                    unicode_text = "\n\n".join(
+                        f"--- Page {i} ---\n{page.unicode_text}"
+                        for i, page in enumerate(converted_doc.pages, 1)
+                    )
+                    translation_result = TranslationResult(
+                        source_text=unicode_text,
+                        translated_text=translated_text,
+                        source_language=source_lang_code,
+                        target_language=target_lang,
+                        translation_backend=engine.backend_type,
+                        chunk_count=len(translated_pages),
+                    )
                 # Check if translation actually happened (warnings indicate failures)
-                if translation_result.warnings:
+                if translation_result and translation_result.warnings:
                     # Check if ALL chunks failed (no translation happened)
                     if len(translation_result.warnings) >= translation_result.chunk_count:
                         progress.update(task, description="[red]✗[/red] Translation failed")
@@ -413,12 +436,12 @@ def translate(
                 else:
                     progress.update(
                         task,
-                        description=f"[green]✓[/green] Translated ({translation_result.chunk_count} chunks)",
+                        description="[green]✓[/green] Translated",
                     )
 
                 if not quiet:
                     console.print(
-                        f"[dim]🌐 Translated:[/dim] {len(unicode_text)} chars → {target_lang}"
+                        f"[dim]🌐 Translated:[/dim] {len(converted_doc.unicode_text)} chars → {target_lang}"
                     )
 
             # Step 5: Generate output
@@ -435,6 +458,12 @@ def translate(
                 # Override output path extension
                 if output.suffix != ".md":
                     output = output.with_suffix(".md")
+            elif structure_preserving and not no_translate and fmt == OutputFormat.PDF:
+                output_content = generator.generate_pdf(
+                    converted_doc,
+                    encoding_result,
+                    structure_preserving_translation=True,
+                )
             else:
                 output_content = generator.generate(
                     converted_doc,
@@ -577,7 +606,9 @@ def convert(
 
             # Convert to Unicode
             converter = UnicodeConverter()
-            converted_doc = converter.convert_document(document, page_encodings=page_encodings)
+            converted_doc = converter.convert_with_recovery(
+                document, encoding_result, page_encodings
+            )
 
             # Output
             generator = OutputGenerator(include_metadata=True)
@@ -780,8 +811,9 @@ def extract(
                 # Convert to Unicode
                 progress.update(task, description="Converting to Unicode...")
                 converter = UnicodeConverter()
-                converted_doc = converter.convert_document(
+                converted_doc = converter.convert_with_recovery(
                     document,
+                    encoding_result,
                     page_encodings=page_encodings,
                 )
                 progress.update(task, description="[green]✓[/green] Converted to Unicode")

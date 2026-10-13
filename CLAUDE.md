@@ -125,6 +125,7 @@ legacylipi/
 | `shree-lipi` | Shree-Lipi, SDL-DEV | Marathi | Legacy Shree fonts |
 | `dvb-tt` | DVBWTTSurekh, DVBTTSurekh | Marathi | Government documents |
 | `kruti-dev` | KrutiDev010, KrutiDev040 | Hindi | Common Hindi encoding |
+| `glyph-id` | Embedded Telugu Identity CID fonts without ToUnicode | Telugu | Optional `glyph` extra; automatic recovery before translation |
 
 Mapping files: `src/legacylipi/mappings/shree_dev.py`, `dvb_tt.py`, `loader.py`
 

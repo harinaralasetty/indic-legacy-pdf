@@ -30,6 +30,7 @@ uv run legacylipi translate INPUT_FILE [OPTIONS]
 | `-o, --output PATH` | Output file path | - |
 | `--format [text\|markdown\|md\|pdf]` | Output format | text |
 | `--encoding TEXT` | Force specific encoding | auto-detect |
+| `--source-lang TEXT` | Source language code (overrides encoding default; glyph-id defaults to Telugu `te`) | auto from encoding |
 | `--target-lang TEXT` | Target language code | en |
 | `--translator [mock\|google\|trans\|mymemory\|ollama\|openai\|gcp_cloud]` | Translation backend | google |
 | `--model TEXT` | Model for Ollama or OpenAI backend | - |

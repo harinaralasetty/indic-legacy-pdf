@@ -12,13 +12,15 @@ import re
 import time
 import unicodedata
 from collections.abc import Sequence
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from difflib import SequenceMatcher
 from itertools import product
 from pathlib import Path
 from typing import Any
 
 import fitz
+
+from legacylipi.core.models import BoundingBox, PDFDocument, PDFPage, TextBlock
 
 VIRAMA = "\u0c4d"
 REPLACEMENT = "\ufffd"
@@ -579,6 +581,7 @@ def verify_roundtrip(
 class RecoveryResult:
     text: str
     report: dict[str, Any]
+    pages: list[PDFPage] = field(default_factory=list)
 
 
 def _tokens(data: bytes) -> list[Any]:
@@ -771,6 +774,8 @@ def _positioned_runs(page: Any, candidates: set[int]) -> list[dict[str, Any]]:
                     "end": span["bbox"][2],
                     "y": span["chars"][0][2][1],
                     "size": span["size"],
+                    "bbox": span["bbox"],
+                    "font_name": span["font"],
                 }
             )
             continue
@@ -797,6 +802,13 @@ def _positioned_runs(page: Any, candidates: set[int]) -> list[dict[str, Any]]:
                     "end": max(c[3][2] for c in segment),
                     "y": segment[0][2][1],
                     "size": span["size"],
+                    "bbox": (
+                        min(c[3][0] for c in segment),
+                        min(c[3][1] for c in segment),
+                        max(c[3][2] for c in segment),
+                        max(c[3][3] for c in segment),
+                    ),
+                    "font_name": span["font"],
                 }
             )
             pos += count
@@ -824,7 +836,7 @@ def _lines(spans: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
     return lines
 
 
-def recover_pdf(pdf_path: str | Path) -> RecoveryResult:
+def recover_pdf(pdf_path: str | Path, *, page_numbers: set[int] | None = None) -> RecoveryResult:
     """Recover candidate fonts; metrics count only glyph-ID fonts, per page/run."""
     _dependencies()
     candidates = find_glyph_id_fonts(pdf_path)
@@ -834,9 +846,14 @@ def recover_pdf(pdf_path: str | Path) -> RecoveryResult:
         )
     pages = []
     texts = []
+    recovered_pages = []
+    if page_numbers is not None:
+        candidates = [f for f in candidates if page_numbers.intersection(f.pages)]
     with fitz.open(pdf_path) as doc:
         maps = {f.xref: build_glyph_map(doc.extract_font(f.xref)[3]) for f in candidates}
         for page in doc:
+            if page_numbers is not None and page.number + 1 not in page_numbers:
+                continue
             spans = _positioned_runs(
                 page, {f.xref for f in candidates if page.number + 1 in f.pages}
             )
@@ -849,6 +866,7 @@ def recover_pdf(pdf_path: str | Path) -> RecoveryResult:
                 "runs": [],
             }
             lines = []
+            blocks = []
             for line in _lines(spans):
                 merged: list[dict[str, Any]] = []
                 for span in line:
@@ -897,7 +915,28 @@ def recover_pdf(pdf_path: str | Path) -> RecoveryResult:
                             parts.append("\t" if gap > span["size"] * 2 else " ")
                     parts.append(text)
                     previous = span
-                lines.append("".join(parts).rstrip())
+                line_text = "".join(parts).rstrip()
+                lines.append(line_text)
+                # One block per visual baseline row, sharing the text recovery's
+                # reading order and whitespace. Keep the leading run's font.
+                blocks.append(
+                    TextBlock(
+                        raw_text=line_text,
+                        unicode_text=line_text,
+                        position=BoundingBox(
+                            min(s["bbox"][0] for s in line),
+                            min(s["bbox"][1] for s in line),
+                            max(s["bbox"][2] for s in line),
+                            max(s["bbox"][3] for s in line),
+                        ),
+                        font_name=line[0]["font_name"],
+                        font_size=line[0]["size"],
+                        detected_encoding="glyph-id" if any(s["xref"] for s in line) else "unicode",
+                    )
+                )
+            recovered_pages.append(
+                PDFPage(page.number + 1, blocks, page.rect.width, page.rect.height)
+            )
             page_text = "\n".join(lines)
             page_report["roundtrip_match_ratio"] = (
                 page_report["matching_glyphs"] / page_report["compared_glyphs"]
@@ -954,4 +993,18 @@ def recover_pdf(pdf_path: str | Path) -> RecoveryResult:
             "Terminal virama is flagged for review, including legitimate loanwords and abbreviations.",
         ],
     }
-    return RecoveryResult(text, report)
+    return RecoveryResult(text, report, recovered_pages)
+
+
+def recover_document(document: PDFDocument, page_numbers: set[int]) -> PDFDocument:
+    """Recover selected pages as positioned blocks; retain all other pages.
+
+    Blocks follow the same approximate visual lines as ``recover_pdf``. Each
+    uses the union of run bounds and the leading run's font name/size. Both text
+    fields contain recovered Unicode because raw glyph codes are not Unicode.
+    """
+    if not page_numbers:
+        return document
+    result = recover_pdf(document.filepath, page_numbers=page_numbers)
+    pages = {page.page_number: page for page in result.pages}
+    return replace(document, pages=[pages.get(page.page_number, page) for page in document.pages])

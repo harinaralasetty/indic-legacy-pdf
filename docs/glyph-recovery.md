@@ -16,12 +16,45 @@ gives an installation message when either dependency is missing.
 ```bash
 uv sync --extra glyph
 uv run legacylipi detect INPUT.pdf
+uv run legacylipi translate INPUT.pdf --translator mock --format markdown -o TRANSLATED.md
+uv run legacylipi translate INPUT.pdf --translator mock --format pdf --structure-preserving -o TRANSLATED.pdf
 uv run legacylipi recover-text INPUT.pdf -o OUT.txt --report REPORT.json
 ```
 
 Without `--report`, the report is written to `OUT.report.json`. Input, text and
 report paths must differ. Missing candidate fonts produce a nonzero exit status.
 A completed recovery can still contain unknown glyphs: review the metrics.
+
+## Translation and positioned output
+
+CLI `translate`, `convert`, `extract`, and the API translation pipeline share
+`UnicodeConverter.convert_with_recovery`. When detection returns `glyph-id`, it
+recovers only pages listed in the per-page detection results. Other pages retain
+the existing conversion handling. Translation defaults to source language `te`;
+CLI `--source-lang` and API `source_lang` override that default.
+
+The commands above use `mock`, which echoes text with a prefix without a network
+request. Select a configured translation backend for actual translation.
+Text, Markdown (including bilingual source text), and positioned PDF output all
+receive recovered Unicode. PDF output prefers an installed Telugu font (Noto
+Sans Telugu, Kohinoor Telugu, Nirmala UI, Lohit Telugu, or Gautami); text/Markdown
+viewers choose their own fonts. Install a Telugu font if none is available.
+
+`recover_document` reuses `recover_pdf`'s run decoding and visual-line grouping.
+It creates one `TextBlock` per approximate baseline row, with the union of its
+run bounding boxes and the leading run's font name and size. Both `raw_text` and
+`unicode_text` contain recovered Unicode. Mixed font sizes within a line and
+semantic column/table reconstruction are not preserved. Document metadata,
+fonts, page numbers, and unselected pages are retained. The API's
+`structure_preserving` mode and CLI `--structure-preserving --format pdf`
+translate and place these blocks individually.
+
+Automatic translation does not save a recovery report; use `recover-text` to
+inspect unknown glyphs, ambiguities, and inferred cmap entries. Missing recovery
+dependencies raise the same `legacylipi[glyph]` installation message. Without
+fontTools, automatic detection cannot verify glyph-ID candidates; install the
+extra before relying on detection, or force `--encoding glyph-id` in the CLI to
+request recovery explicitly.
 
 ## How it works
 
@@ -71,7 +104,7 @@ with a four-map limit. No font or map files are written. Build timings include
 cmap repair and enumeration. Three-consonant enumeration took under 20 seconds
 per font in local tests; exact measured times are in the JSON reports. The
 script parameter currently accepts only `telugu`; unsupported scripts fail
-explicitly. No translation pipeline is invoked.
+explicitly. The `recover-text` command itself does not translate.
 
 ## Trimmed cmap repair and assumptions
 

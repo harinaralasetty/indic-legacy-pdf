@@ -2,6 +2,7 @@
 
 # Mapping from encoding name to ISO 639-1 language code
 ENCODING_LANGUAGE_MAP: dict[str, str] = {
+    "glyph-id": "te",
     "shree-dev": "mr",
     "shree-dev-0714": "mr",
     "shree-dev-0708": "mr",

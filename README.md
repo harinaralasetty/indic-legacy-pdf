@@ -114,12 +114,20 @@ See [docs/cli-reference.md](docs/cli-reference.md) for complete CLI documentatio
 
 ## Telugu glyph-ID text recovery
 
-For embedded Telugu fonts whose PDF omits `/ToUnicode`, use reverse shaping:
+Embedded Telugu fonts whose PDF omits `/ToUnicode` are recovered automatically
+before translation in the CLI and API. Install the optional recovery dependencies:
 
 ```bash
 uv sync --extra glyph
-uv run legacylipi recover-text INPUT.pdf -o OUT.txt --report REPORT.json
+uv run legacylipi translate INPUT.pdf --translator mock --format text -o OUT.txt
+uv run legacylipi translate INPUT.pdf --translator mock --format pdf --structure-preserving -o OUT.pdf
+uv run legacylipi recover-text INPUT.pdf -o RECOVERED.txt --report REPORT.json
 ```
+
+The examples use the offline `mock` backend, which echoes recovered Telugu with
+a prefix; choose a configured backend for an actual translation. Glyph-ID input
+defaults to Telugu (`te`); `--source-lang` overrides it. `convert` and `extract`
+also recover automatically. Use `recover-text` for the detailed recovery report.
 
 `detect` flags `glyph-id` only when fontTools verifies Telugu support and page
 text uses those fonts; existing legacy font-name detection takes precedence.
@@ -187,6 +195,7 @@ This runs:
 | aps-dv | APS-DV-TT | Hindi | Built-in |
 | walkman-chanakya | Walkman Chanakya | Hindi | Built-in |
 | shusha | Shusha | Marathi/Hindi | Built-in |
+| glyph-id | Embedded Telugu Identity CID fonts without ToUnicode | Telugu | Optional `glyph` extra |
 
 ## Translation Backends
 

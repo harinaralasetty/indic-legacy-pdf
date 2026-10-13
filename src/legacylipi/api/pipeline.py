@@ -213,7 +213,7 @@ async def run_translate(
             converter = UnicodeConverter()
             converted_doc = await loop.run_in_executor(
                 None,
-                lambda: converter.convert_document(document, page_encodings=page_encodings),
+                lambda: converter.convert_with_recovery(document, encoding_result, page_encodings),
             )
 
         # Step 4: Translate

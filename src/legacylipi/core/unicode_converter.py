@@ -5,7 +5,7 @@ Kruti Dev, etc.) to proper Unicode Devanagari.
 """
 
 import unicodedata
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from legacylipi.core.models import (
     EncodingDetectionResult,
@@ -338,6 +338,27 @@ class UnicodeConverter:
             text_blocks=converted_blocks,
             width=page.width,
             height=page.height,
+        )
+
+    def convert_with_recovery(
+        self,
+        document: PDFDocument,
+        encoding_result: EncodingDetectionResult,
+        page_encodings: dict[int, EncodingDetectionResult],
+    ) -> PDFDocument:
+        """Recover glyph-ID pages, otherwise use the existing conversion path."""
+        if encoding_result.detected_encoding != "glyph-id":
+            return self.convert_document(document, page_encodings=page_encodings)
+
+        from legacylipi.core.glyph_recovery import recover_document
+
+        recovered = recover_document(document, set(page_encodings))
+        return replace(
+            recovered,
+            pages=[
+                page if page.page_number in page_encodings else self.convert_page(page)
+                for page in recovered.pages
+            ],
         )
 
     def convert_document(

@@ -352,7 +352,9 @@ Generated: {metadata.generated_at}"""
         metadata = self.generate_metadata(document, encoding_result, translation_result)
 
         # Find a font that supports the content
-        font_path = self._get_unicode_font()
+        font_path = self._get_unicode_font(
+            "te" if encoding_result.detected_encoding == "glyph-id" else None
+        )
 
         # Check for structure-preserving translation mode
         if structure_preserving_translation:
@@ -1164,12 +1166,30 @@ Generated: {metadata.generated_at}"""
                 color=color,
             )
 
-    def _get_unicode_font(self) -> str | None:
-        """Find a font that supports Unicode/Devanagari on the system.
+    def _get_unicode_font(self, language: str | None = None) -> str | None:
+        """Find a Unicode font, preferring Telugu coverage when requested.
 
         Returns:
             Path to a Unicode-capable font file, or None if not found.
         """
+        if language == "te":
+            telugu_paths = [
+                str(Path(__file__).parent.parent / "fonts" / "NotoSansTelugu-Regular.ttf"),
+                "/usr/share/fonts/truetype/noto/NotoSansTelugu-Regular.ttf",
+                "/usr/share/fonts/truetype/lohit-telugu/Lohit-Telugu.ttf",
+                "/usr/share/fonts/lohit-telugu/Lohit-Telugu.ttf",
+                "/System/Library/Fonts/KohinoorTelugu.ttc",
+                "/System/Library/Fonts/Supplemental/Kohinoor Telugu.ttc",
+                "/Library/Fonts/NotoSansTelugu-Regular.ttf",
+                str(Path.home() / "Library/Fonts/NotoSansTelugu-Regular.ttf"),
+                "C:/Windows/Fonts/Nirmala.ttf",
+                "C:/Windows/Fonts/NirmalaUI.ttf",
+                "C:/Windows/Fonts/gautami.ttf",
+            ]
+            for font_path in telugu_paths:
+                if Path(font_path).exists():
+                    return font_path
+
         # Check bundled font first
         bundled_font = Path(__file__).parent.parent / "fonts" / "NotoSansDevanagari-Regular.ttf"
         if bundled_font.exists():
