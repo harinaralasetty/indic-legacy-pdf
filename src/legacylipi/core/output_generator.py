@@ -51,6 +51,7 @@ class OutputGenerator:
             include_metadata: Whether to include metadata header in output.
             include_page_numbers: Whether to include page number markers.
         """
+        self.warnings: list[dict[str, str]] = []
         self._include_metadata = include_metadata
         self._include_page_numbers = include_page_numbers
         self._text_wrapper: TextWrapper | None = None  # Lazy initialized with font
@@ -345,6 +346,7 @@ Generated: {metadata.generated_at}"""
         Returns:
             PDF content as bytes.
         """
+        self.warnings = []
         # Create a new PDF document
         pdf_doc = fitz.open()
 
@@ -352,9 +354,7 @@ Generated: {metadata.generated_at}"""
         metadata = self.generate_metadata(document, encoding_result, translation_result)
 
         # Find a font that supports the content
-        font_path = self._get_unicode_font(
-            "te" if encoding_result.detected_encoding == "glyph-id" else None
-        )
+        font_path = self._get_unicode_font()
 
         # Check for structure-preserving translation mode
         if structure_preserving_translation:
@@ -1150,11 +1150,14 @@ Generated: {metadata.generated_at}"""
             font_path: Path to font file (or None for default).
             color: RGB color tuple.
         """
-        if font_path and Path(font_path).exists() and any("\u0c00" <= c <= "\u0c7f" for c in text):
-            from legacylipi.core.shaped_output import insert_shaped_text
-
-            insert_shaped_text(page, x, y, text, fontsize, font_path, color)
-        elif font_path and Path(font_path).exists():
+        if any("\u0c00" <= char <= "\u0c7f" for char in text) and not self.warnings:
+            self.warnings.append(
+                {
+                    "code": "pdf-indic-unshaped",
+                    "message": "PDF output does not shape Indic scripts. Use text/markdown output for Telugu text.",
+                }
+            )
+        if font_path and Path(font_path).exists():
             # Use TextWriter with custom font for proper Unicode support
             tw = fitz.TextWriter(page.rect)
             font = fitz.Font(fontfile=font_path)
@@ -1170,30 +1173,12 @@ Generated: {metadata.generated_at}"""
                 color=color,
             )
 
-    def _get_unicode_font(self, language: str | None = None) -> str | None:
-        """Find a Unicode font, preferring Telugu coverage when requested.
+    def _get_unicode_font(self) -> str | None:
+        """Find a font that supports Unicode/Devanagari on the system.
 
         Returns:
             Path to a Unicode-capable font file, or None if not found.
         """
-        if language == "te":
-            telugu_paths = [
-                str(Path(__file__).parent.parent / "fonts" / "NotoSansTelugu-Regular.ttf"),
-                "/usr/share/fonts/truetype/noto/NotoSansTelugu-Regular.ttf",
-                "/usr/share/fonts/truetype/lohit-telugu/Lohit-Telugu.ttf",
-                "/usr/share/fonts/lohit-telugu/Lohit-Telugu.ttf",
-                "/System/Library/Fonts/KohinoorTelugu.ttc",
-                "/System/Library/Fonts/Supplemental/Kohinoor Telugu.ttc",
-                "/Library/Fonts/NotoSansTelugu-Regular.ttf",
-                str(Path.home() / "Library/Fonts/NotoSansTelugu-Regular.ttf"),
-                "C:/Windows/Fonts/Nirmala.ttf",
-                "C:/Windows/Fonts/NirmalaUI.ttf",
-                "C:/Windows/Fonts/gautami.ttf",
-            ]
-            for font_path in telugu_paths:
-                if Path(font_path).exists():
-                    return font_path
-
         # Check bundled font first
         bundled_font = Path(__file__).parent.parent / "fonts" / "NotoSansDevanagari-Regular.ttf"
         if bundled_font.exists():

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import math
 import re
 import sys
 import threading
@@ -98,6 +99,7 @@ MAX_CANDIDATE_FONTS = 8
 MAX_ALIGNMENT_WORK = 4_000_000
 MAX_RUN_ALIGNMENT_WORK = 250_000
 WORD_GAP_EM = 0.15
+UNCERTAIN_GAP_EM = (0.10, 0.25)
 COLUMN_GAP_EM = 2.0
 MAX_MAP_BYTES = 768 * 1024 * 1024
 
@@ -247,9 +249,13 @@ def _reference(doc: Any, xref: int, key: str) -> int:
 
 
 def _descendant(doc: Any, xref: int) -> int:
-    value = doc.xref_get_key(xref, "DescendantFonts")[1]
-    match = re.search(r"(\d+)\s+\d+\s+R", value)
-    return int(match[1]) if match else 0
+    kind, value = doc.xref_get_key(xref, "DescendantFonts")
+    if kind == "xref":
+        value = doc.xref_object(int(value.split()[0]))
+    match = re.fullmatch(r"\[\s*(\d+)\s+\d+\s+R\s*\]", value)
+    if not match or doc.xref_get_key(int(match[1]), "Type")[1] != "/Font":
+        raise ValueError("Invalid CID DescendantFonts: expected one font dictionary reference")
+    return int(match[1])
 
 
 def _is_telugu_font(font_bytes: bytes) -> bool:
@@ -878,43 +884,89 @@ def _tokens(data: bytes) -> list[Any]:
 
 
 def _cid_widths(doc: Any, xref: int, budget: _Budget) -> tuple[float, dict[int, float]]:
-    """PDF advances, not ink bounds, define geometric word gaps."""
+    """Validate CID widths before using advances for geometric word gaps."""
     child = _descendant(doc, xref)
+
+    def number(value: Any, key: str, *, index: bool = False) -> float:
+        if not isinstance(value, str) or not re.fullmatch(
+            r"[+-]?\d+" if index else r"[+-]?(?:\d+\.?\d*|\.\d+)", value
+        ):
+            raise ValueError(
+                f"Invalid CID {key}: expected {'integer index' if index else 'numeric width'}"
+            )
+        result = float(value)
+        if not math.isfinite(result) or (index and not 0 <= result <= 65535):
+            raise ValueError(f"Invalid CID {key}: number out of range")
+        return result
+
     kind, value = doc.xref_get_key(child, "DW")
-    default = float(value) if kind in ("int", "float") else 1000.0
+    if kind == "null":
+        default = 1000.0
+    elif kind in ("int", "float"):
+        default = number(value, "DW")
+    else:
+        raise ValueError("Invalid CID DW: expected numeric default width")
     kind, value = doc.xref_get_key(child, "W")
     if kind == "null":
         return default, {}
     if kind == "xref":
         value = doc.xref_object(int(value.split()[0]))
+    elif kind != "array":
+        raise ValueError("Invalid CID W: expected width array")
     if len(value) > MAX_STREAM_BYTES:
         raise RecoveryBudgetError("Font widths byte budget exceeded")
-    tokens = _tokens(value.encode())[1:-1]
+    tokens = _tokens(value.encode())
+    if not tokens or tokens[0] != "[" or tokens[-1] != "]":
+        raise ValueError("Invalid CID W: expected complete width array")
+    tokens = tokens[1:-1]
     widths: dict[int, float] = {}
     i = 0
     while i < len(tokens):
         budget.operation()
-        first = int(tokens[i])
+        first = int(number(tokens[i], "W", index=True))
+        if i + 1 >= len(tokens):
+            raise ValueError("Invalid CID W: truncated width entry")
         if tokens[i + 1] == "[":
             i += 2
             cid = first
-            while tokens[i] != "]":
+            while i < len(tokens) and tokens[i] != "]":
                 budget.operation()
-                if not 0 <= cid <= 65535:
-                    raise ValueError("Invalid CID width index")
-                widths[cid] = float(tokens[i])
+                if cid > 65535:
+                    raise ValueError("Invalid CID W: index out of range")
+                widths[cid] = number(tokens[i], "W")
                 cid += 1
                 i += 1
+            if i == len(tokens):
+                raise ValueError("Invalid CID W: unterminated width list")
             i += 1
         else:
-            last, width = int(tokens[i + 1]), float(tokens[i + 2])
-            if not 0 <= first <= last <= 65535:
-                raise ValueError("Invalid CID width range")
+            if i + 2 >= len(tokens):
+                raise ValueError("Invalid CID W: truncated width range")
+            last = int(number(tokens[i + 1], "W", index=True))
+            width = number(tokens[i + 2], "W")
+            if first > last:
+                raise ValueError("Invalid CID W: reversed width range")
             for cid in range(first, last + 1):
                 budget.operation()
                 widths[cid] = width
             i += 3
     return default, widths
+
+
+@dataclass
+class _TextState:
+    font_xref: int = 0
+    mode: int = 0
+    font_size: float = 0
+    char_spacing: float = 0
+    word_spacing: float = 0
+    horizontal_scale: float = 1
+    matrix: Any = field(default_factory=lambda: fitz.Matrix(1, 1))
+    ctm: Any = field(default_factory=lambda: fitz.Matrix(1, 1))
+
+
+# Width, tracking and em size in page coordinates for each painted glyph.
+_RawRun = tuple[int, list[int], list[float], list[float], list[float]]
 
 
 def _raw_runs(
@@ -924,10 +976,13 @@ def _raw_runs(
     budget: _Budget | None = None,
     discovery: bool = False,
     _used_fonts: set[int] | None = None,
-) -> dict[str, list[tuple[int, list[int], list[float]]]]:
+) -> dict[str, list[_RawRun]]:
     """Read bounded raw runs; discovery visits each Form/resource context once.
 
-    Positioning syntax never determines word breaks; trace geometry does.
+    Trace origins supply geometry; PDF text state supplies expected advances.
+    Ts/TL/Td/TD affect trace baselines, not horizontal advances. Identity-H/V
+    codes are two bytes, so Tw (which applies only to single-byte 0x20) never
+    adds advance here, even for a CID/GID whose Unicode mapping is a space.
     """
     budget = budget or _Budget()
     doc = page.parent
@@ -939,12 +994,21 @@ def _raw_runs(
     forms: dict[int, dict[str, int]] = {}
     for xref, name, owner, *_ in page.get_xobjects():
         forms.setdefault(owner, {})[name] = xref
-    runs: dict[str, list[tuple[int, list[int], list[float]]]] = {}
+    runs: dict[str, list[_RawRun]] = {}
     cid_maps = {}
     widths = {xref: _cid_widths(doc, xref, budget) for xref in candidates}
     for xref in candidates:
-        ref = _reference(doc, _descendant(doc, xref), "CIDToGIDMap")
-        cid_maps[xref] = budget.stream(doc, ref) if ref else None
+        kind, value = doc.xref_get_key(_descendant(doc, xref), "CIDToGIDMap")
+        if kind == "xref":
+            ref = int(value.split()[0])
+            if not doc.xref_is_stream(ref):
+                raise ValueError("Invalid CIDToGIDMap: expected stream")
+            data = budget.stream(doc, ref)
+            cid_maps[xref] = data
+        elif kind == "null" or (kind == "name" and value == "/Identity"):
+            cid_maps[xref] = None
+        else:
+            raise ValueError("Invalid CIDToGIDMap: expected Identity or stream")
     used: set[int] = _used_fonts if _used_fonts is not None else set()
     visited: set[tuple[Any, ...]] = set()
     numeric = re.compile(r"[+-]?(?:\d+\.?\d*|\.\d+)")
@@ -954,19 +1018,19 @@ def _raw_runs(
         owner: int,
         inherited: dict[str, int],
         active: tuple[int, ...],
-        font_xref: int = 0,
-        mode: int = 0,
+        state: _TextState | None = None,
     ) -> None:
         if len(active) > 32:
             raise RecoveryBudgetError("Form nesting budget exceeded")
+        state = state or _TextState()
         fonts = inherited | resources.get(owner, {})
-        key = owner, tuple(sorted(fonts.items())), font_xref, mode
+        key = owner, tuple(sorted(fonts.items())), state.font_xref, state.mode
         if discovery and key in visited:
             return
         visited.add(key)
         budget.expand()
         args: list[Any] = []
-        stack: list[tuple[int, int]] = []
+        stack: list[_TextState] = []
         for token in _tokens(data):
             budget.operation()  # Includes operands: bounds token and operator work.
             if (
@@ -980,6 +1044,11 @@ def _raw_runs(
             arity = {
                 "Tf": 2,
                 "Tr": 1,
+                "Tc": 1,
+                "Tw": 1,
+                "Tz": 1,
+                "Ts": 1,
+                "TL": 1,
                 "Tm": 6,
                 "Td": 2,
                 "TD": 2,
@@ -997,32 +1066,54 @@ def _raw_runs(
             ):
                 raise ValueError(f"Malformed PDF operator {token}: font/resource name")
             numbers = args[1:] if token == "Tf" else args
-            if token in ("Tf", "Tr", "Tm", "Td", "TD", "cm") and any(
+            if token in ("Tf", "Tr", "Tc", "Tw", "Tz", "Ts", "TL", "Tm", "Td", "TD", "cm") and any(
                 not isinstance(a, str) or not numeric.fullmatch(a) for a in numbers
             ):
                 raise ValueError(f"Malformed PDF operator {token}: numeric operands")
             if token == "Tf":
-                font_xref = fonts.get(args[0][1:], 0)
+                state.font_xref = fonts.get(args[0][1:], 0)
+                state.font_size = float(args[1])
+            elif token == "Tc":
+                state.char_spacing = float(args[0])
+            elif token == "Tw":
+                state.word_spacing = float(args[0])
+            elif token == "Tz":
+                state.horizontal_scale = float(args[0]) / 100
+            elif token == "BT":
+                state.matrix = fitz.Matrix(1, 1)
+            elif token == "Tm":
+                state.matrix = fitz.Matrix(*(float(a) for a in args))
+            elif token == "cm":
+                state.ctm = fitz.Matrix(*(float(a) for a in args)) * state.ctm
             elif token == "Tr":
-                mode = int(float(args[0]))
-                if mode not in range(8):
+                state.mode = int(float(args[0]))
+                if state.mode not in range(8):
                     raise ValueError("Malformed PDF render mode")
             elif token == "q":
-                stack.append((font_xref, mode))
+                stack.append(replace(state))
             elif token == "Q":
-                font_xref, mode = stack.pop() if stack else (0, 0)
+                # Text matrices are not part of the saved graphics state.
+                matrix = state.matrix
+                state = stack.pop() if stack else _TextState()
+                state.matrix = matrix
             elif token == "Do":
                 target = forms.get(owner, {}).get(args[0][1:])
                 if target:
                     if target in active:
                         raise ValueError("Cyclic PDF Form resources")
+                    form_state = replace(state)
+                    kind, value = doc.xref_get_key(target, "Matrix")
+                    if kind != "null":
+                        matrix = _tokens(value.encode())
+                        if len(matrix) != 8 or matrix[0] != "[" or matrix[-1] != "]":
+                            raise ValueError("Malformed Form Matrix")
+                        form_state.ctm = fitz.Matrix(*(float(a) for a in matrix[1:-1])) * state.ctm
                     visit(
                         budget.stream(doc, target),
                         target,
                         fonts,
                         (*active, target),
-                        font_xref,
-                        mode,
+                        form_state,
                     )
             elif token in ("Tj", "TJ", "'", '"'):
                 if token == "TJ":
@@ -1039,10 +1130,13 @@ def _raw_runs(
                         raise ValueError("Malformed PDF operator TJ")
                 elif not isinstance(args[-1], bytes):
                     raise ValueError(f"Malformed PDF operator {token}: text string")
-                if mode in (3, 7):  # Invisible OCR and clipping-only are excluded.
+                if token == '"':
+                    state.word_spacing, state.char_spacing = float(args[0]), float(args[1])
+                if state.mode in (3, 7):  # Invisible OCR and clipping-only are excluded.
                     args = []
                     continue
                 chunks = [b"".join(arg for arg in args if isinstance(arg, bytes))]
+                font_xref = state.font_xref
                 if any(chunks):
                     used.add(font_xref)
                 if font_xref in candidates:
@@ -1060,8 +1154,21 @@ def _raw_runs(
                         )
                         if gids:
                             default, table = widths[font_xref]
+                            # Project the text advance through Tz, Tm and the CTM.
+                            # Origins already include rise, leading and positioning.
+                            scale = state.horizontal_scale * (state.matrix * state.ctm).a
+                            em = abs(state.font_size * scale)
                             runs.setdefault(names[font_xref], []).append(
-                                (font_xref, gids, [table.get(c, default) / 1000 for c in cids])
+                                (
+                                    font_xref,
+                                    gids,
+                                    [
+                                        table.get(c, default) / 1000 * state.font_size * scale
+                                        for c in cids
+                                    ],
+                                    [state.char_spacing * scale] * len(cids),
+                                    [em] * len(cids),
+                                )
                             )
             args = []
         if args:
@@ -1117,7 +1224,7 @@ def _positioned_runs(
         while pos < len(chars):
             if index >= len(raw[name]):
                 raise ValueError("PDF raw text and MuPDF trace have different glyph counts")
-            xref, gids, widths = raw[name][index]
+            xref, gids, widths, tracking, sizes = raw[name][index]
             count = min(len(chars) - pos, len(gids) - offset)
             segment = chars[pos : pos + count]
             values = gids[offset : offset + count]
@@ -1130,8 +1237,9 @@ def _positioned_runs(
                     "xref": xref,
                     "gids": values,
                     "origins": [c[2][0] for c in segment],
-                    "widths": [w * span["size"] for w in widths[offset : offset + count]],
-                    "sizes": [span["size"]] * count,
+                    "widths": widths[offset : offset + count],
+                    "tracking": tracking[offset : offset + count],
+                    "sizes": sizes[offset : offset + count],
                     "advances": [
                         (chars[pos + i + 1][2][0] - c[2][0])
                         if pos + i + 1 < len(chars)
@@ -1235,7 +1343,7 @@ def recover_pdf(
                         )
                     ):
                         merged[-1]["gids"].extend(span["gids"])
-                        for key in ("advances", "origins", "widths", "sizes"):
+                        for key in ("advances", "origins", "widths", "sizes", "tracking"):
                             merged[-1].setdefault(key, []).extend(span.get(key, []))
                         merged[-1]["text"] += span["text"]
                         merged[-1]["end"] = max(merged[-1]["end"], span["end"])
@@ -1266,13 +1374,18 @@ def recover_pdf(
             inferred_entries = {
                 r["codepoint"] for r in mapping.cmap_repairs if r["source"].startswith("inferred")
             }
-            for _number, _, _, lines in page_data:
+            for number, _, _, lines in page_data:
                 for line in lines:
                     for span in line:
                         if span["xref"] not in font_xrefs:
                             continue
                         origins = span["origins"]
-                        advances = [b - a for a, b in zip(origins, origins[1:], strict=False)]
+                        advances = [
+                            b - a - tracking
+                            for a, b, tracking in zip(
+                                origins, origins[1:], span["tracking"], strict=False
+                            )
+                        ]
                         advances.append(span["widths"][-1])
                         decoded = decode_glyph_stream(span["gids"], mapping, advances=advances)
                         used = {f"U+{ord(c):04X}" for c in decoded.text} & inferred_entries
@@ -1291,9 +1404,26 @@ def recover_pdf(
                                 and not text.startswith(" ")
                             ):
                                 gap = (
-                                    origins[start] - origins[start - 1] - span["widths"][start - 1]
+                                    origins[start]
+                                    - origins[start - 1]
+                                    - span["widths"][start - 1]
+                                    - span["tracking"][start - 1]
                                 )
-                                size = span["sizes"][start]
+                                size = span["sizes"][start - 1]
+                                if (
+                                    size
+                                    and UNCERTAIN_GAP_EM[0] <= gap / size <= UNCERTAIN_GAP_EM[1]
+                                ):
+                                    warnings.append(
+                                        {
+                                            "code": "spacing_ambiguity",
+                                            "message": "A geometric gap is near the word boundary threshold; whitespace is uncertain.",
+                                            "page": number,
+                                            "font_xref": span["xref"],
+                                            "glyph_index": start,
+                                            "gap_em": gap / size,
+                                        }
+                                    )
                                 if gap > size * WORD_GAP_EM + 0.001:
                                     cluster_parts.append(
                                         "\t" if gap > size * COLUMN_GAP_EM else " "
@@ -1440,6 +1570,7 @@ def recover_pdf(
         "fonts": font_reports,
         "pages": reports,
         "warnings": warnings,
+        "spacing_ambiguity": [w for w in warnings if w["code"] == "spacing_ambiguity"],
         "inferred_codepoints": sorted(inferred),
         "limitations": [
             "Round-trip is internal consistency, not semantic verification.",

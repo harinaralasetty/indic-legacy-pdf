@@ -10,7 +10,7 @@ mapping cannot undo Indic shaping.
 Install the `glyph` extra (`uharfbuzz` and `fonttools`). It is also included in
 `dev`. Detection requires fontTools to verify Telugu support in the embedded
 font program; without it, detection returns no glyph-ID candidates and preserves
-the existing detection path. HarfBuzz is required for recovery and shaped Telugu PDF output. Recovery
+the existing detection path. HarfBuzz is required for recovery only. PDF output does not import HarfBuzz. Recovery
 gives an installation message when either dependency is missing.
 
 ```bash
@@ -42,17 +42,13 @@ CLI `--source-lang` and API `source_lang` override that default.
 The commands above use `mock`, which echoes text with a prefix without a network
 request. Select a configured translation backend for actual translation.
 Text, Markdown (including bilingual source text), and positioned PDF output all
-receive recovered Unicode. PDF output prefers an installed Telugu font (Noto
-Sans Telugu, Kohinoor Telugu, Nirmala UI, Lohit Telugu, or Gautami); text/Markdown
-viewers choose their own fonts. Install a Telugu font if none is available.
-Telugu PDF text paints HarfBuzz-shaped GIDs using occurrence-specific CIDs,
-`CIDToGIDMap`, and a logical `ToUnicode` CMap for each output font run. Ligatures
-map to their complete logical text; empty logical glyphs have a glyph-local empty
-`ActualText` span. This avoids whole-line `ActualText` duplication. Missing Latin
-letters use the bundled Noto Sans Devanagari font. Tests check exact PyMuPDF and
-pypdf extraction, painted GIDs, and installed-font glyph positions. PyMuPDF trace
-entries with GID -1 represent extra logical characters, not painted glyphs.
-Devanagari-only text retains its existing rendering path.
+receive recovered Unicode. PDF output uses the same font selection and TextWriter
+as ordinary documents. It does not shape Indic scripts. If the written output
+contains Telugu (including source text or Telugu translations), the CLI emits a
+warning and API results include `pdf-indic-unshaped` in their warning list. Use
+text/markdown output and a viewer with Indic shaping for Telugu. English-only
+PDF output needs no warning. Optional recovery dependencies are not required
+for ordinary Unicode or Latin PDF output.
 
 `recover_document` reuses `recover_pdf`'s run decoding and visual-line grouping.
 It creates one `TextBlock` per approximate baseline row, with the union of its
@@ -243,13 +239,16 @@ these warnings, including in quiet mode. `--strict-cmap` / `strict_cmap=True`
 (default false) refuses recovery if any output mapping needs inference.
 Semantic glyph-name repairs do not count as inferred cmap gaps.
 
-Word boundaries use one geometric rule, regardless of `TJ`, `Tj`, `Td`, or `Tm`
-syntax: subtract the previous glyph's PDF advance (`W`/`DW`) from the distance
-between glyph origins. A remaining gap greater than 0.15 em adds a space; above
-2 em it adds a tab. A 0.001-point tolerance avoids floating-point threshold noise.
-Only recovered cluster boundaries are eligible: kerning inside a matched
-syllable/conjunct does not split it. Physical positioning is checked independently
-of logical text and does not become evidence in the round-trip score.
+Word boundaries use residual horizontal gaps at decoded cluster boundaries,
+regardless of `TJ`, `Tj`, `Td`, or `Tm` syntax. Expected advances include CID
+widths and `Tc`, transformed by font size, `Tz`, the text matrix and graphics
+matrix. `Ts` and `TL` are reflected in traced baselines. PDF `Tw` only applies
+to single-byte character code 32, so it does not add space to two-byte Identity
+codes, even if a code maps to a Unicode space. A residual gap greater than
+0.15 em adds a space; above 2 em it adds a tab. Gaps from 0.10 through 0.25 em
+are explicitly uncertain: `spacing_ambiguity` entries appear in both the report
+field and the CLI/API warning list. Encoded spaces are preserved. Whitespace
+inferred from layout is heuristic and is not verified by the round-trip score.
 
 A space GID after virama with zero advance may be a ZWJ/ZWNJ alias. Recovery
 keeps a joiner-less form and adds `ambiguous-joiner`; a positive observed advance
@@ -303,3 +302,8 @@ and two-value unpacking remain compatible, with warnings attached separately.
 The review tests use frozen golden outputs and generated fixtures, not a local
 `main` ref. Large generated-document checks are marked `slow` and skipped when
 `CI` is set; unit complexity checks use deterministic operation/expansion counts.
+
+Speculative detection treats content-budget exhaustion as inconclusive, logs a
+warning and retains ordinary detection. Explicit recovery still returns the
+controlled budget error. Malformed CID `DW`, `W`, `DescendantFonts` and
+`CIDToGIDMap` structures are rejected with descriptive errors.

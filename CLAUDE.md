@@ -127,6 +127,10 @@ legacylipi/
 | `kruti-dev` | KrutiDev010, KrutiDev040 | Hindi | Common Hindi encoding |
 | `glyph-id` | Embedded Telugu Identity CID fonts without ToUnicode | Telugu | Optional `glyph` extra; automatic recovery before translation |
 
+PDF output retains the ordinary font selection and text writer and does not shape
+Indic scripts. Telugu in PDF output produces CLI/API warnings recommending
+text/markdown. HarfBuzz is used only for glyph-ID recovery, not PDF output.
+
 Mapping files: `src/legacylipi/mappings/shree_dev.py`, `dvb_tt.py`, `loader.py`
 
 ## Translation Backends (translator.py)

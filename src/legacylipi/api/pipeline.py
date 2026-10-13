@@ -92,7 +92,7 @@ async def run_convert(
     filename: str,
     config: ConvertRequest,
     progress_callback: ProgressCallback | None = None,
-) -> tuple[bytes, str]:
+) -> PipelineResult:
     """Run OCR + Unicode conversion (no translation).
 
     Returns (result_bytes, result_filename).
@@ -154,7 +154,7 @@ async def run_convert(
         result_filename = f"{Path(filename).stem}_converted{ext}"
 
         await _report(progress_callback, 100, "complete", "Conversion complete!")
-        return result_bytes, result_filename
+        return PipelineResult(result_bytes, result_filename, generator.warnings)
     finally:
         tmp_path.unlink(missing_ok=True)
 
@@ -389,7 +389,7 @@ async def run_translate(
             result_filename = f"{Path(filename).stem}_translated{ext}"
 
         await _report(progress_callback, 100, "complete", "Translation complete!")
-        warnings = list(converted_doc.warnings)
+        warnings = [*converted_doc.warnings, *generator.warnings]
         warnings.extend(
             {"code": "translation-failure", "message": block.translation_error}
             for page in converted_doc.pages

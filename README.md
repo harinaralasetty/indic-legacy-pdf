@@ -142,12 +142,15 @@ Manual comparison was done once on one page region by a reviewer, not reproducib
 from the repository; the repository evidence is synthetic ground-truth tests.
 The JSON `verification_note` and CLI footer explain this limit; inserted layout
 whitespace and order between runs are not checked.
-Invisible and clip-only text is excluded; fill+stroke is deduplicated. Telugu PDF
-output uses HarfBuzz with occurrence-specific CID/GID and Unicode maps, tested for
-exact PyMuPDF/pypdf extraction. Spacing uses a single geometric gap rule (>0.15 em)
-at cluster boundaries for all PDF positioning operators. Recovery counts distinct
-used font programs by hash; unused fonts consume no allowance. Hard content/font/
-memory limits stop recovery. Diagnostic alignment exhaustion retains text with
+Invisible and clip-only text is excluded; fill+stroke is deduplicated. PDF output
+uses the original font selection and text writer; it does not shape Indic scripts.
+When Telugu text is written to a PDF, the CLI and API warn and recommend text/markdown.
+PDF output needs no `glyph` extra. Recovery accounts for character tracking and
+horizontal text transforms before inferring word gaps; borderline gaps carry a
+`spacing_ambiguity` warning. Recovery counts distinct used font programs by hash;
+unused fonts consume no allowance. Hard content/font/memory limits stop explicit
+recovery. Budget exhaustion during speculative detection is inconclusive and
+preserves ordinary processing. Diagnostic alignment exhaustion retains text with
 `verification_complete: false`, a null round-trip score, and a warning; joiner
 ambiguity is also reported.
 See [glyph recovery and its limits](docs/glyph-recovery.md).

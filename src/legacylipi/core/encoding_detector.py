@@ -4,6 +4,7 @@ This module provides functionality to detect whether text is Unicode or
 uses a legacy Indian font encoding (Shree-Lipi, Kruti Dev, etc.).
 """
 
+import logging
 import re
 from dataclasses import dataclass
 
@@ -147,6 +148,9 @@ LEGACY_FONT_PATTERNS: list[LegacyFontPattern] = [
         priority=5,
     ),
 ]
+
+
+logger = logging.getLogger(__name__)
 
 
 class EncodingDetector:
@@ -432,7 +436,11 @@ class EncodingDetector:
         if document.filepath.is_file():
             from legacylipi.core.glyph_recovery import find_glyph_id_fonts
 
-            candidates = find_glyph_id_fonts(document.filepath)
+            try:
+                candidates = find_glyph_id_fonts(document.filepath)
+            except (ValueError, RuntimeError) as exc:
+                logger.warning("Glyph discovery inconclusive; using ordinary detection: %s", exc)
+                candidates = []
             affected = {page for font in candidates for page in font.pages}
             if affected:
                 result = EncodingDetectionResult(

@@ -170,12 +170,3 @@ def test_other_cli_conversion(pdf, tmp_path, command):
     result = CliRunner().invoke(main, [command, str(pdf), "-o", str(out)])
     assert result.exit_code == 0, result.output
     assert LINES[0] in out.read_text()
-
-
-def test_telugu_output_font(monkeypatch):
-    from pathlib import Path
-
-    # A bundled Devanagari font must not mask an installed Telugu font.
-    telugu = "/System/Library/Fonts/KohinoorTelugu.ttc"
-    monkeypatch.setattr(Path, "exists", lambda p: str(p) == telugu or "Devanagari" in str(p))
-    assert OutputGenerator()._get_unicode_font("te") == telugu

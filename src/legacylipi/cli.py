@@ -483,6 +483,8 @@ def translate(
                     fmt,
                 )
 
+            _show_recovery_warnings(generator.warnings)
+
             # Save output
             generator.save(output_content, output)
             progress.update(task, description=f"[green]✓[/green] Saved to {output.name}")
@@ -553,7 +555,7 @@ def translate(
             )
         else:
             print_error(str(e))
-            if not quiet:
+            if not quiet and not isinstance(e, ValueError):
                 console.print_exception()
         sys.exit(1)
 
@@ -850,6 +852,8 @@ def extract(
                 output_format=fmt,
             )
 
+            _show_recovery_warnings(generator.warnings)
+
             # Save output
             generator.save(output_content, output)
             progress.update(task, description=f"[green]✓[/green] Saved to {output.name}")
@@ -877,7 +881,7 @@ def extract(
         sys.exit(1)
     except Exception as e:
         print_error(str(e))
-        if not quiet:
+        if not quiet and not isinstance(e, ValueError):
             console.print_exception()
         sys.exit(1)
 

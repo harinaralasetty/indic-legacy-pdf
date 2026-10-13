@@ -15,7 +15,6 @@ import legacylipi.core.glyph_recovery as gr
 from legacylipi.cli import main
 from legacylipi.core.encoding_detector import EncodingDetector
 from legacylipi.core.models import FontInfo, PDFDocument, PDFPage, TextBlock
-from legacylipi.core.output_generator import OutputGenerator
 from legacylipi.core.pdf_parser import parse_pdf
 from legacylipi.core.translator import MockTranslationBackend, TranslationError
 from legacylipi.core.unicode_converter import UnicodeConverter
@@ -173,20 +172,6 @@ def test_r6_joiner_alias_is_not_space(joiner):
     )
     assert result.text == "క్క"
     assert any(w["code"] == "ambiguous-joiner" for w in result.warnings)
-
-
-def test_r7_output_gids_are_shaped(tmp_path, monkeypatch):
-    pdf = make_pdf(tmp_path / "shape.pdf", lines=["స్త్రీ"])
-    doc = parse_pdf(pdf)
-    overall, pages = EncodingDetector().detect_from_document(doc)
-    doc = UnicodeConverter().convert_with_recovery(doc, overall, pages)
-    monkeypatch.setattr(OutputGenerator, "_get_unicode_font", lambda *a, **k: str(FONT))
-    output = OutputGenerator(include_metadata=False).generate_pdf(doc, overall)
-    with fitz.open(stream=output, filetype="pdf") as rendered:
-        assert [
-            c[1] for s in rendered[0].get_texttrace() for c in s["chars"] if c[1] >= 0
-        ] == shape("స్త్రీ", FONT.read_bytes())
-        assert rendered[0].get_text().strip() == "స్త్రీ"
 
 
 @pytest.mark.parametrize("link", ["hard", "symbolic"])
