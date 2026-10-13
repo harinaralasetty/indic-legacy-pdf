@@ -438,33 +438,6 @@ class EncodingDetector:
         total_confidence = 0.0
         result_count = 0
 
-        # Preserve existing legacy-font detection before considering glyph IDs.
-        # Check every font so an earlier Unicode font cannot mask a legacy match.
-        for font in document.fonts:
-            doc_font_result = self.detect_from_font_name(font.name)
-            if doc_font_result and doc_font_result.is_legacy:
-                for page in document.pages:
-                    page_results[page.page_number] = doc_font_result
-                return doc_font_result, page_results
-
-        # Glyph-ID wins over text heuristics only on pages with nonempty text
-        # operands carried by Telugu-verified candidate fonts, never mere font
-        # resources. With no legacy-font match above, any such page sets the
-        # document result; only those pages receive the glyph-ID page result.
-        if document.filepath.is_file():
-            from legacylipi.core.glyph_recovery import find_glyph_id_fonts
-
-            candidates = find_glyph_id_fonts(document.filepath)
-            if candidates:
-                result = EncodingDetectionResult(
-                    detected_encoding="glyph-id",
-                    confidence=1.0,
-                    method=DetectionMethod.FONT_MATCH,
-                    font_name=", ".join(font.base_font_name for font in candidates),
-                )
-                affected = {page for font in candidates for page in font.pages}
-                return result, dict.fromkeys(sorted(affected), result)
-
         # Analyze each page
         for page in document.pages:
             page_encoding: str | None = None
@@ -492,6 +465,32 @@ class EncodingDetector:
                 encoding_counts[page_encoding] = encoding_counts.get(page_encoding, 0) + 1
                 total_confidence += page_confidence
                 result_count += 1
+
+        # Inspect only used fonts; resource dictionaries also contain unused fonts.
+        # Keep normal page results for every page not selected for recovery.
+        if document.filepath.is_file():
+            from legacylipi.core.glyph_recovery import find_glyph_id_fonts
+
+            candidates = find_glyph_id_fonts(document.filepath)
+            legacy_pages = {
+                page.page_number
+                for page in document.pages
+                if any(
+                    (match := self.detect_from_font_name(block.font_name or "")) and match.is_legacy
+                    for block in page.text_blocks
+                    if block.raw_text
+                )
+            }
+            affected = {page for font in candidates for page in font.pages} - legacy_pages
+            if affected:
+                result = EncodingDetectionResult(
+                    detected_encoding="glyph-id",
+                    confidence=1.0,
+                    method=DetectionMethod.FONT_MATCH,
+                    font_name=", ".join(font.base_font_name for font in candidates),
+                )
+                page_results.update(dict.fromkeys(sorted(affected), result))
+                return result, page_results
 
         # Determine overall document encoding
         if not encoding_counts:

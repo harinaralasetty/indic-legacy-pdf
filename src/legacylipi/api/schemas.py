@@ -21,6 +21,7 @@ class ConvertRequest(BaseModel):
 
 
 class TranslateRequest(BaseModel):
+    strict_cmap: bool = False
     target_lang: str = "en"
     source_lang: str | None = None  # Auto-detected from encoding if not provided
     output_format: Literal["pdf", "text", "markdown"] = "pdf"
@@ -59,6 +60,8 @@ class ProgressEvent(BaseModel):
     message: str = ""
     filename: str | None = None
     file_size: int | None = None
+    warnings: list[dict] = Field(default_factory=list)
+    inferred_codepoints: list[str] = Field(default_factory=list)
 
 
 class HealthResponse(BaseModel):

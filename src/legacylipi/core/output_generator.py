@@ -1150,7 +1150,44 @@ Generated: {metadata.generated_at}"""
             font_path: Path to font file (or None for default).
             color: RGB color tuple.
         """
-        if font_path and Path(font_path).exists():
+        if font_path and Path(font_path).exists() and any("\u0c00" <= c <= "\u0c7f" for c in text):
+            # Story/HTML uses HarfBuzz shaping. TextWriter maps codepoints only.
+            import html
+
+            path = Path(font_path)
+            css = (
+                f"@font-face {{font-family: recovery; src: url('{path.name}');}} "
+                f"* {{font-family: recovery; font-size: {fontsize}pt; margin: 0; padding: 0;}} "
+                f"body {{margin: 0; padding: 0; color: rgb({','.join(str(int(c * 255)) for c in color)});}}"
+            )
+            existing_contents = set(page.get_contents())
+            spare, _ = page.insert_htmlbox(
+                fitz.Rect(
+                    x,
+                    max(0, y - fontsize),
+                    page.rect.width,
+                    min(page.rect.height, y + fontsize * 3),
+                ),
+                html.escape(text),
+                css=css,
+                archive=fitz.Archive(str(path.parent)),
+                scale_low=1,
+            )
+            if spare < 0:
+                raise ValueError("Shaped Telugu text does not fit the output page")
+            # Ligature GIDs need not have direct cmap entries. Preserve the
+            # logical Unicode string for copy/search independently of painting.
+            actual_text = "FEFF" + text.encode("utf-16-be").hex()
+            for xref in page.get_contents():
+                if xref not in existing_contents:
+                    content = page.parent.xref_stream(xref)
+                    page.parent.update_stream(
+                        xref,
+                        f"/Span << /ActualText <{actual_text}> >> BDC\n".encode()
+                        + content
+                        + b"\nEMC",
+                    )
+        elif font_path and Path(font_path).exists():
             # Use TextWriter with custom font for proper Unicode support
             tw = fitz.TextWriter(page.rect)
             font = fitz.Font(fontfile=font_path)

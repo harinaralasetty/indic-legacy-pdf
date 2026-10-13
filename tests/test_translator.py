@@ -5,9 +5,6 @@ import shutil
 import pytest
 
 from legacylipi.core.models import TranslationBackend
-
-# Check if translate-shell is available
-TRANS_AVAILABLE = shutil.which("trans") is not None
 from legacylipi.core.translator import (
     GoogleTranslateBackend,
     MockTranslationBackend,
@@ -22,6 +19,9 @@ from legacylipi.core.utils.language_codes import (
     get_language_name,
     get_mymemory_code,
 )
+
+# Check if translate-shell is available
+TRANS_AVAILABLE = shutil.which("trans") is not None
 
 
 class TestTranslationConfig:

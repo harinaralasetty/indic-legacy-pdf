@@ -349,7 +349,7 @@ class TestGPUDetection:
         import legacylipi.core.ocr_parser as ocr_module
 
         # Force reimport by clearing from cache
-        with patch("legacylipi.core.ocr_parser.logger") as mock_logger:
+        with patch("legacylipi.core.ocr_parser.logger"):
             # Simulate ImportError for torch
             def raise_import_error():
                 raise ImportError("No module named 'torch'")
@@ -379,11 +379,11 @@ class TestGPUDetection:
                     import torch
 
                     if torch.cuda.is_available():
-                        result = (True, "cuda")
+                        _result = (True, "cuda")
                     else:
-                        result = (False, "cpu")
+                        _result = (False, "cpu")
                 except ImportError:
-                    result = (False, "cpu")
+                    _result = (False, "cpu")
 
                 # Since we can't easily reimport, test the mock directly
                 assert mock_torch.cuda.is_available() is True

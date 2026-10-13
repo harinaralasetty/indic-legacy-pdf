@@ -10,14 +10,28 @@ import asyncio
 import logging
 import os
 import tempfile
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterator
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from legacylipi.api.schemas import ConvertRequest, ScanCopyRequest, TranslateRequest
 
 logger = logging.getLogger(__name__)
 
 ProgressCallback = Callable[[int, str, str], Awaitable[None]]
+
+
+@dataclass
+class PipelineResult:
+    content: bytes
+    filename: str
+    warnings: list[dict] = field(default_factory=list)
+    inferred_codepoints: list[str] = field(default_factory=list)
+
+    def __iter__(self) -> Iterator[Any]:
+        # Preserve the existing two-value unpacking API.
+        return iter((self.content, self.filename))
 
 
 async def _report(cb: ProgressCallback | None, percent: int, step: str, message: str):
@@ -145,7 +159,7 @@ async def run_translate(
     filename: str,
     config: TranslateRequest,
     progress_callback: ProgressCallback | None = None,
-) -> tuple[bytes, str]:
+) -> PipelineResult:
     """Run the full translation pipeline.
 
     Returns (result_bytes, result_filename).
@@ -213,7 +227,9 @@ async def run_translate(
             converter = UnicodeConverter()
             converted_doc = await loop.run_in_executor(
                 None,
-                lambda: converter.convert_with_recovery(document, encoding_result, page_encodings),
+                lambda: converter.convert_with_recovery(
+                    document, encoding_result, page_encodings, strict_cmap=config.strict_cmap
+                ),
             )
 
         # Step 4: Translate
@@ -368,6 +384,15 @@ async def run_translate(
             result_filename = f"{Path(filename).stem}_translated{ext}"
 
         await _report(progress_callback, 100, "complete", "Translation complete!")
-        return result_bytes, result_filename
+        warnings = list(converted_doc.warnings)
+        warnings.extend(
+            {"code": "translation-failure", "message": block.translation_error}
+            for page in converted_doc.pages
+            for block in page.text_blocks
+            if block.translation_error
+        )
+        return PipelineResult(
+            result_bytes, result_filename, warnings, converted_doc.inferred_codepoints
+        )
     finally:
         tmp_path.unlink(missing_ok=True)

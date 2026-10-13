@@ -376,7 +376,7 @@ class TestEdgeCases:
         pdf_path = temp_dir / "image.pdf"
 
         doc = fitz.open()
-        page = doc.new_page()
+        doc.new_page()
         # Just an empty page (simulating image-only)
         doc.save(pdf_path)
         doc.close()

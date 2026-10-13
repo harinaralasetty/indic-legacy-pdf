@@ -97,6 +97,7 @@ class TextBlock:
     font_category: str | None = None  # heading, body, or caption (set by FontSizeAnalyzer)
     is_bold: bool = False
     is_italic: bool = False
+    translation_error: str | None = None
 
     @property
     def is_converted(self) -> bool:
@@ -168,6 +169,8 @@ class PDFDocument:
     pages: list[PDFPage] = field(default_factory=list)
     metadata: DocumentMetadata = field(default_factory=DocumentMetadata)
     fonts: list[FontInfo] = field(default_factory=list)
+    warnings: list[dict] = field(default_factory=list)
+    inferred_codepoints: list[str] = field(default_factory=list)
 
     @property
     def page_count(self) -> int:

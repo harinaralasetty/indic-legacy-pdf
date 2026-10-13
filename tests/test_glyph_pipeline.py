@@ -6,7 +6,6 @@ from unittest.mock import Mock
 import fitz
 import pytest
 from click.testing import CliRunner
-from tests.glyph_helpers import FONT, LINES, make_pdf
 
 from legacylipi.api.pipeline import run_translate
 from legacylipi.api.schemas import TranslateRequest
@@ -17,6 +16,7 @@ from legacylipi.core.output_generator import OutputGenerator
 from legacylipi.core.pdf_parser import parse_pdf
 from legacylipi.core.translator import MockTranslationBackend
 from legacylipi.core.unicode_converter import UnicodeConverter
+from tests.glyph_helpers import FONT, LINES, make_pdf
 
 
 @pytest.fixture

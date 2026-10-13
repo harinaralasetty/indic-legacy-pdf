@@ -9,8 +9,11 @@ from __future__ import annotations
 import hashlib
 import io
 import re
+import sys
+import threading
 import time
 import unicodedata
+import zlib
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field, replace
 from difflib import SequenceMatcher
@@ -85,14 +88,78 @@ SIGN_NAMES = dict(
     )
 )
 _CACHE: dict[tuple[str, str], GlyphMap] = {}
-CACHE_LIMIT = 4
+CACHE_LIMIT = 1
+_CACHE_LOCK = threading.RLock()
+MAX_OPERATIONS = 2_000_000
+MAX_FORM_EXPANSIONS = 4096
+MAX_STREAM_BYTES = 16 * 1024 * 1024
+MAX_TOTAL_BYTES = 64 * 1024 * 1024
+MAX_CANDIDATE_FONTS = 8
+MAX_ALIGNMENT_WORK = 4_000_000
+MAX_MAP_BYTES = 768 * 1024 * 1024
+
+
+class RecoveryBudgetError(ValueError):
+    """A controlled refusal, never a silent non-candidate result."""
+
+
+@dataclass
+class _Budget:
+    operations: int = 0
+    expansions: int = 0
+    decoded: int = 0
+    alignment_work: int = 0
+    streams: dict[int, bytes] = field(default_factory=dict)
+
+    def stream(self, doc: Any, xref: int) -> bytes:
+        if xref in self.streams:
+            return self.streams[xref]
+        length_kind, length = doc.xref_get_key(xref, "Length")
+        if length_kind == "int" and int(length) > MAX_STREAM_BYTES:
+            raise RecoveryBudgetError("Encoded stream byte budget exceeded")
+        raw = doc.xref_stream_raw(xref)
+        kind, filter_name = doc.xref_get_key(xref, "Filter")
+        if kind == "null":
+            data = raw
+        elif filter_name in ("/FlateDecode", "[/FlateDecode]"):
+            decoder = zlib.decompressobj()
+            try:
+                data = decoder.decompress(
+                    raw, min(MAX_STREAM_BYTES, MAX_TOTAL_BYTES - self.decoded) + 1
+                )
+            except zlib.error as exc:
+                raise ValueError("Malformed compressed PDF stream") from exc
+            if decoder.unconsumed_tail or not decoder.eof:
+                raise RecoveryBudgetError("Decoded stream byte budget exceeded or truncated stream")
+        else:
+            raise ValueError(f"Unsupported stream filter for bounded recovery: {filter_name}")
+        if len(data) > MAX_STREAM_BYTES:
+            raise RecoveryBudgetError("Decoded stream byte budget exceeded")
+        self.decoded += len(data)
+        if self.decoded > MAX_TOTAL_BYTES:
+            raise RecoveryBudgetError("Total decoded byte budget exceeded")
+        self.streams[xref] = data
+        return data
+
+    def operation(self) -> None:
+        self.operations += 1
+        if self.operations > MAX_OPERATIONS:
+            raise RecoveryBudgetError("Content operation budget exceeded")
+
+    def expand(self) -> None:
+        self.expansions += 1
+        if self.expansions > MAX_FORM_EXPANSIONS:
+            raise RecoveryBudgetError("Form expansion budget exceeded")
+
+
 _TELUGU_FONT_CACHE: dict[str, bool] = {}
 FONT_VERDICT_CACHE_LIMIT = 128
 VERIFICATION_NOTE = (
     "round-trip = internal consistency of reading order/whitespace/ambiguity; "
     "it does NOT verify that inferred cmap mappings are correct; inferred entries "
-    "are listed in the report and were spot-checked visually against page renders "
-    "for the Gautami sample only. The map and this check use the same shaping and "
+    "are listed in the report. Manual comparison was done once on one page region "
+    "by a reviewer (Gautami sample only), not reproducible from this repository. "
+    "Repository evidence is synthetic ground-truth tests. The map and this check use the same shaping and "
     "cmap assumptions; inserted layout whitespace and order between runs are not checked. "
     "This recovery run does not perform a visual check."
 )
@@ -170,7 +237,7 @@ def _is_telugu_font(font_bytes: bytes) -> bool:
     return verified
 
 
-def _candidate(doc: Any, xref: int) -> bool:
+def _candidate(doc: Any, xref: int, budget: _Budget) -> bool:
     if not xref or doc.xref_get_key(xref, "Subtype")[1] != "/Type0":
         return False
     if doc.xref_get_key(xref, "Encoding")[1] not in ("/Identity-H", "/Identity-V"):
@@ -190,13 +257,13 @@ def _candidate(doc: Any, xref: int) -> bool:
         and doc.xref_get_key(descendant, "Subtype")[1] == "/CIDFontType2"
         and doc.xref_is_stream(truetype)
     ):
-        return _is_telugu_font(doc.xref_stream(truetype))
+        return _is_telugu_font(budget.stream(doc, truetype))
     if (
         opentype
         and doc.xref_get_key(opentype, "Subtype")[1] == "/OpenType"
         and doc.xref_is_stream(opentype)
     ):
-        return _is_telugu_font(doc.xref_stream(opentype))
+        return _is_telugu_font(budget.stream(doc, opentype))
     return False
 
 
@@ -209,18 +276,23 @@ def find_glyph_id_fonts(pdf_path: str | Path) -> list[GlyphIdFont]:
     """
     found: dict[int, GlyphIdFont] = {}
     verdicts: dict[int, bool] = {}
+    budget = _Budget()
     with fitz.open(pdf_path) as doc:
         for page in doc:
             names = {}
             for xref, _, _, name, *_ in page.get_fonts(full=True):
                 if xref not in verdicts:
-                    verdicts[xref] = _candidate(doc, xref)
+                    verdicts[xref] = _candidate(doc, xref, budget)
+                    if sum(verdicts.values()) > MAX_CANDIDATE_FONTS:
+                        raise RecoveryBudgetError("Candidate font budget exceeded")
                 if verdicts[xref]:
                     names[xref] = name
             if not names:
                 continue
             try:
-                runs = _raw_runs(page, set(names))
+                runs = _raw_runs(page, set(names), budget=budget, discovery=True)
+            except RecoveryBudgetError:
+                raise
             except ValueError:
                 continue
             used = {xref for group in runs.values() for xref, _ in group}
@@ -250,6 +322,7 @@ class GlyphMap:
     max_length: int = 0
     _collision_index: dict[tuple[int, ...], int] = field(default_factory=dict, repr=False)
     _font: Any = field(default=None, repr=False)
+    estimated_bytes: int = 0
 
     def add(self, gids: tuple[int, ...], text: str) -> None:
         if not gids or 0 in gids:
@@ -264,6 +337,12 @@ class GlyphMap:
                 collision["alternatives"].append(text)
             text = min(previous, text, key=_canonical)
             collision["canonical"] = text
+        if previous is None:
+            # Conservative accounted size includes tuple, scalar IDs, string,
+            # dictionary overhead and room for collision/extension bookkeeping.
+            self.estimated_bytes += sys.getsizeof(gids) + sys.getsizeof(text) + 128 + 28 * len(gids)
+            if self.estimated_bytes > MAX_MAP_BYTES:
+                raise RecoveryBudgetError("Glyph map memory budget exceeded")
         self.mapping[gids] = text
         self.max_length = max(self.max_length, len(gids))
 
@@ -364,6 +443,13 @@ def _shape(text: str, font: Any) -> tuple[int, ...]:
 
 
 def build_glyph_map(font_bytes: bytes, script: str = "telugu") -> GlyphMap:
+    # Serialize cache builds/mutations: cold requests for a key share one map;
+    # different keys also serialize so construction cannot exceed the cache budget.
+    with _CACHE_LOCK:
+        return _build_glyph_map(font_bytes, script)
+
+
+def _build_glyph_map(font_bytes: bytes, script: str = "telugu") -> GlyphMap:
     """Build a bounded in-memory reverse map, keyed by original font SHA-256.
 
     One/two consonant clusters include all supported signs/modifiers. Three
@@ -377,6 +463,7 @@ def build_glyph_map(font_bytes: bytes, script: str = "telugu") -> GlyphMap:
     key = digest, script
     if key in _CACHE:
         return _CACHE[key]
+    _CACHE.clear()  # Release the prior map before allocating a new one.
     start = time.perf_counter()
     prepared, cmap, repairs, features = _prepare_font(font_bytes)
     font = hb.Font(hb.Face(prepared))
@@ -440,6 +527,7 @@ class DecodeResult:
     text: str
     unknown_count: int
     total_glyphs: int
+    warnings: list[dict[str, Any]] = field(default_factory=list)
 
 
 def _extend_conjunct(
@@ -478,17 +566,38 @@ def _extend_conjunct(
     return best
 
 
-def decode_glyph_stream(gids: Sequence[int], glyph_map: GlyphMap) -> DecodeResult:
+def decode_glyph_stream(
+    gids: Sequence[int], glyph_map: GlyphMap, *, advances: Sequence[float] | None = None
+) -> DecodeResult:
+    with _CACHE_LOCK:
+        return _decode_glyph_stream(gids, glyph_map, advances=advances)
+
+
+def _decode_glyph_stream(
+    gids: Sequence[int], glyph_map: GlyphMap, *, advances: Sequence[float] | None = None
+) -> DecodeResult:
     """Greedy longest exact GID match; every unknown GID yields one U+FFFD."""
     values = tuple(gids)
     text = []
     unknown = 0
+    warnings: list[dict[str, Any]] = []
     pos = 0
     while pos < len(values):
         for length in range(min(glyph_map.max_length, len(values) - pos), 0, -1):
             match = glyph_map.mapping.get(values[pos : pos + length])
             if match is not None:
                 match, length = _extend_conjunct(values, pos, match, length, glyph_map)
+                if match == " " and text and text[-1].endswith(VIRAMA):
+                    # Default ignorables can alias the space GID. Without an
+                    # observable positive advance, do not invent a word boundary.
+                    if advances is None or abs(advances[pos]) < 0.01:
+                        match = ""
+                        warnings.append(
+                            {
+                                "code": "ambiguous-joiner",
+                                "message": "Space GID after virama may be ZWJ/ZWNJ; kept joiner-less text.",
+                            }
+                        )
                 text.append(match)
                 pos += length
                 break
@@ -496,7 +605,7 @@ def decode_glyph_stream(gids: Sequence[int], glyph_map: GlyphMap) -> DecodeResul
             text.append(REPLACEMENT)
             unknown += 1
             pos += 1
-    return DecodeResult("".join(text), unknown, len(values))
+    return DecodeResult("".join(text), unknown, len(values), warnings)
 
 
 @dataclass
@@ -536,7 +645,11 @@ def _well_formedness(text: str) -> tuple[float, list[dict[str, Any]]]:
 
 
 def verify_roundtrip(
-    recovered_text: str, original_gids: Sequence[int], font: GlyphMap | bytes
+    recovered_text: str,
+    original_gids: Sequence[int],
+    font: GlyphMap | bytes,
+    *,
+    _budget: _Budget | None = None,
 ) -> RoundtripReport:
     """Reshape the complete recovered run under the reverse map's assumptions.
 
@@ -556,20 +669,30 @@ def verify_roundtrip(
     # A missing-glyph box is not evidence of recovered text, even if both
     # streams contain .notdef. Use an impossible GID only for alignment.
     comparable = tuple(gid if gid else -1 for gid in reshaped)
-    matcher = SequenceMatcher(a=original, b=comparable, autojunk=False)
-    matched = sum(block.size for block in matcher.get_matching_blocks())
-    mismatches = [
-        {
-            "original_start": i,
-            "original_end": j,
-            "recovered_start": a,
-            "recovered_end": b,
-            "original_gids": list(original[i:j]),
-            "reshaped_gids": list(reshaped[a:b]),
-        }
-        for op, i, j, a, b in matcher.get_opcodes()
-        if op != "equal"
-    ]
+    mismatches = []
+    if original == comparable:
+        matched = len(original)
+    else:
+        work = len(original) * len(comparable)
+        if _budget is not None:
+            _budget.alignment_work += work
+            work = _budget.alignment_work
+        if work > MAX_ALIGNMENT_WORK:
+            raise RecoveryBudgetError("Round-trip alignment work budget exceeded")
+        matcher = SequenceMatcher(a=original, b=comparable, autojunk=False)
+        matched = sum(block.size for block in matcher.get_matching_blocks())
+        mismatches = [
+            {
+                "original_start": i,
+                "original_end": j,
+                "recovered_start": a,
+                "recovered_end": b,
+                "original_gids": list(original[i:j]),
+                "reshaped_gids": list(reshaped[a:b]),
+            }
+            for op, i, j, a, b in matcher.get_opcodes()
+            if op != "equal"
+        ]
     denominator = max(len(original), len(reshaped))
     ratio, issues = _well_formedness(recovered_text)
     return RoundtripReport(
@@ -582,6 +705,8 @@ class RecoveryResult:
     text: str
     report: dict[str, Any]
     pages: list[PDFPage] = field(default_factory=list)
+    warnings: list[dict[str, Any]] = field(default_factory=list)
+    inferred_codepoints: list[str] = field(default_factory=list)
 
 
 def _tokens(data: bytes) -> list[Any]:
@@ -671,12 +796,20 @@ def _tokens(data: bytes) -> list[Any]:
     return result
 
 
-def _raw_runs(page: Any, candidates: set[int]) -> dict[str, list[tuple[int, list[int]]]]:
-    """Read Identity string operands by font resource, including nested Forms.
+def _raw_runs(
+    page: Any,
+    candidates: set[int],
+    *,
+    budget: _Budget | None = None,
+    discovery: bool = False,
+) -> dict[str, list[tuple[int, list[int]]]]:
+    """Read bounded raw runs; discovery visits each Form/resource context once.
 
-    MuPDF resolves resources and supplies positions; raw bytes are authoritative
-    for CIDs, with CIDToGIDMap applied before the reverse map is consulted.
+    TJ displacements are in thousandths of the font em. A negative adjustment
+    of at least 250 opens a >= 0.25 * font-size gap and splits a word. Positive
+    adjustments close gaps; smaller adjustments remain within the syllable.
     """
+    budget = budget or _Budget()
     doc = page.parent
     resources: dict[int, dict[str, int]] = {}
     names = {}
@@ -689,10 +822,11 @@ def _raw_runs(page: Any, candidates: set[int]) -> dict[str, list[tuple[int, list
     runs: dict[str, list[tuple[int, list[int]]]] = {}
     cid_maps = {}
     for xref in candidates:
-        descendant = _descendant(doc, xref)
-        ref = _reference(doc, descendant, "CIDToGIDMap")
-        cid_maps[xref] = doc.xref_stream(ref) if ref else None
+        ref = _reference(doc, _descendant(doc, xref), "CIDToGIDMap")
+        cid_maps[xref] = budget.stream(doc, ref) if ref else None
     used: set[int] = set()
+    visited: set[tuple[Any, ...]] = set()
+    numeric = re.compile(r"[+-]?(?:\d+\.?\d*|\.\d+)")
 
     def visit(
         data: bytes,
@@ -700,67 +834,151 @@ def _raw_runs(page: Any, candidates: set[int]) -> dict[str, list[tuple[int, list
         inherited: dict[str, int],
         active: tuple[int, ...],
         font_xref: int = 0,
+        mode: int = 0,
     ) -> None:
         if len(active) > 32:
-            raise ValueError("Excessively nested PDF Form resources")
+            raise RecoveryBudgetError("Form nesting budget exceeded")
         fonts = inherited | resources.get(owner, {})
+        key = owner, tuple(sorted(fonts.items())), font_xref, mode
+        if discovery and key in visited:
+            return
+        visited.add(key)
+        budget.expand()
         args: list[Any] = []
-        stack: list[int] = []
+        stack: list[tuple[int, int]] = []
         for token in _tokens(data):
+            budget.operation()  # Includes operands: bounds token and operator work.
             if (
                 isinstance(token, bytes)
                 or token.startswith("/")
                 or token in ("[", "]", "<<", ">>")
-                or re.fullmatch(r"[+-]?(?:\d+\.?\d*|\.\d+)", token)
+                or numeric.fullmatch(token)
             ):
                 args.append(token)
                 continue
+            arity = {
+                "Tf": 2,
+                "Tr": 1,
+                "Tm": 6,
+                "Td": 2,
+                "TD": 2,
+                "Tj": 1,
+                "TJ": 2,
+                "'": 1,
+                '"': 3,
+                "Do": 1,
+                "cm": 6,
+            }
+            if token in arity and len(args) != arity[token] and token != "TJ":
+                raise ValueError(f"Malformed PDF operator {token}: operand count")
+            if token in ("Tf", "Do") and (
+                not args or not isinstance(args[0], str) or not args[0].startswith("/")
+            ):
+                raise ValueError(f"Malformed PDF operator {token}: font/resource name")
+            numbers = args[1:] if token == "Tf" else args
+            if token in ("Tf", "Tr", "Tm", "Td", "TD", "cm") and any(
+                not isinstance(a, str) or not numeric.fullmatch(a) for a in numbers
+            ):
+                raise ValueError(f"Malformed PDF operator {token}: numeric operands")
             if token == "Tf":
-                font_xref = fonts.get(args[-2][1:], 0)
+                font_xref = fonts.get(args[0][1:], 0)
+            elif token == "Tr":
+                mode = int(float(args[0]))
+                if mode not in range(8):
+                    raise ValueError("Malformed PDF render mode")
             elif token == "q":
-                stack.append(font_xref)
+                stack.append((font_xref, mode))
             elif token == "Q":
-                font_xref = stack.pop() if stack else 0
-            elif token == "Do" and args:
-                target = forms.get(owner, {}).get(args[-1][1:])
+                font_xref, mode = stack.pop() if stack else (0, 0)
+            elif token == "Do":
+                target = forms.get(owner, {}).get(args[0][1:])
                 if target:
                     if target in active:
                         raise ValueError("Cyclic PDF Form resources")
-                    visit(doc.xref_stream(target), target, fonts, (*active, target), font_xref)
+                    visit(
+                        budget.stream(doc, target),
+                        target,
+                        fonts,
+                        (*active, target),
+                        font_xref,
+                        mode,
+                    )
             elif token in ("Tj", "TJ", "'", '"'):
-                raw = b"".join(a for a in args if isinstance(a, bytes))
-                if raw:
-                    used.add(font_xref)
-                if font_xref not in candidates:
+                if token == "TJ":
+                    if (
+                        len(args) < 2
+                        or args[0] != "["
+                        or args[-1] != "]"
+                        or any(
+                            not isinstance(a, bytes)
+                            and (not isinstance(a, str) or not numeric.fullmatch(a))
+                            for a in args[1:-1]
+                        )
+                    ):
+                        raise ValueError("Malformed PDF operator TJ")
+                elif not isinstance(args[-1], bytes):
+                    raise ValueError(f"Malformed PDF operator {token}: text string")
+                if mode in (3, 7):  # Invisible OCR and clipping-only are excluded.
                     args = []
                     continue
-                if len(raw) % 2:
-                    raise ValueError("Identity text operand has an odd byte count")
-                cids = [int.from_bytes(raw[i : i + 2], "big") for i in range(0, len(raw), 2)]
-                cid_map = cid_maps[font_xref]
-                gids = (
-                    [int.from_bytes(cid_map[2 * c : 2 * c + 2], "big") for c in cids]
-                    if cid_map is not None
-                    else cids
-                )
-                if gids:
-                    runs.setdefault(names[font_xref], []).append((font_xref, gids))
+                chunks = [bytearray()]
+                for arg in args:
+                    if isinstance(arg, bytes):
+                        chunks[-1].extend(arg)
+                    elif (
+                        token == "TJ"
+                        and numeric.fullmatch(arg)
+                        and float(arg) <= -250
+                        and chunks[-1]
+                    ):
+                        chunks.append(bytearray())
+                if any(chunks):
+                    used.add(font_xref)
+                if font_xref in candidates:
+                    for raw in chunks:
+                        if len(raw) % 2:
+                            raise ValueError("Identity text operand has an odd byte count")
+                        cids = [
+                            int.from_bytes(raw[i : i + 2], "big") for i in range(0, len(raw), 2)
+                        ]
+                        cid_map = cid_maps[font_xref]
+                        gids = (
+                            [int.from_bytes(cid_map[2 * c : 2 * c + 2], "big") for c in cids]
+                            if cid_map is not None
+                            else cids
+                        )
+                        if gids:
+                            runs.setdefault(names[font_xref], []).append((font_xref, gids))
             args = []
+        if args:
+            raise ValueError("Trailing PDF operands without operator")
 
-    visit(page.read_contents(), 0, {}, ())
-    # Only drawn fonts can cause ambiguity when joining raw runs to trace spans.
-    # Unused resources often duplicate a candidate's name and are harmless.
+    for content in page.get_contents():
+        # Concatenation preserves graphics/text state across content streams.
+        budget.stream(doc, content)
+    visit(b"\n".join(budget.stream(doc, ref) for ref in page.get_contents()), 0, {}, ())
     for xref in candidates & used:
         if any(names.get(other) == names[xref] for other in used - candidates):
             raise ValueError("Ambiguous font name shared by candidate and ordinary fonts")
     return runs
 
 
-def _positioned_runs(page: Any, candidates: set[int]) -> list[dict[str, Any]]:
-    raw = _raw_runs(page, candidates)
+def _positioned_runs(
+    page: Any, candidates: set[int], budget: _Budget | None = None
+) -> list[dict[str, Any]]:
+    raw = _raw_runs(page, candidates, budget=budget)
     offsets = {name: [0, 0] for name in raw}
     spans = []
+    previous_paint = None
     for span in page.get_texttrace():
+        if span["type"] == 3:
+            continue
+        paint = (span["font"], span["chars"], span["bbox"])
+        # MuPDF emits an immediately adjacent fill/stroke pair for Tr 2/6.
+        if span["type"] == 1 and previous_paint == paint:
+            previous_paint = None
+            continue
+        previous_paint = paint if span["type"] == 0 else None
         if not span["chars"]:
             continue
         name = span["font"].split("+")[-1]
@@ -797,6 +1015,12 @@ def _positioned_runs(page: Any, candidates: set[int]) -> list[dict[str, Any]]:
                 {
                     "xref": xref,
                     "gids": values,
+                    "advances": [
+                        (chars[pos + i + 1][2][0] - c[2][0])
+                        if pos + i + 1 < len(chars)
+                        else c[3][2] - c[3][0]
+                        for i, c in enumerate(segment)
+                    ],
                     "text": "",
                     "x": segment[0][2][0],
                     "end": max(c[3][2] for c in segment),
@@ -836,37 +1060,33 @@ def _lines(spans: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
     return lines
 
 
-def recover_pdf(pdf_path: str | Path, *, page_numbers: set[int] | None = None) -> RecoveryResult:
-    """Recover candidate fonts; metrics count only glyph-ID fonts, per page/run."""
+def recover_pdf(
+    pdf_path: str | Path, *, page_numbers: set[int] | None = None, strict_cmap: bool = False
+) -> RecoveryResult:
+    """Recover visible text within aggregate budgets; disclose used cmap inference."""
     _dependencies()
     candidates = find_glyph_id_fonts(pdf_path)
+    if page_numbers is not None:
+        candidates = [f for f in candidates if page_numbers.intersection(f.pages)]
     if not candidates:
         raise ValueError(
             "No used Telugu-verified glyph-ID fonts found (Identity-H/V without ToUnicode)."
         )
-    pages = []
-    texts = []
-    recovered_pages = []
-    if page_numbers is not None:
-        candidates = [f for f in candidates if page_numbers.intersection(f.pages)]
+    warnings: list[dict[str, Any]] = []
+    inferred: set[str] = set()
+    font_reports = []
+    page_data = []
+    budget = _Budget()
     with fitz.open(pdf_path) as doc:
-        maps = {f.xref: build_glyph_map(doc.extract_font(f.xref)[3]) for f in candidates}
+        # Validate all expanded content before asking MuPDF for trace positions.
+        # In particular this refuses exponential paint graphs before rendering.
         for page in doc:
             if page_numbers is not None and page.number + 1 not in page_numbers:
                 continue
             spans = _positioned_runs(
-                page, {f.xref for f in candidates if page.number + 1 in f.pages}
+                page, {f.xref for f in candidates if page.number + 1 in f.pages}, budget
             )
-            page_report: dict[str, Any] = {
-                "page": page.number + 1,
-                "total_glyphs": 0,
-                "unknown_count": 0,
-                "matching_glyphs": 0,
-                "compared_glyphs": 0,
-                "runs": [],
-            }
             lines = []
-            blocks = []
             for line in _lines(spans):
                 merged: list[dict[str, Any]] = []
                 for span in line:
@@ -876,82 +1096,145 @@ def recover_pdf(pdf_path: str | Path, *, page_numbers: set[int] | None = None) -
                         and span["x"] - merged[-1]["end"] <= max(1, span["size"] * 0.15)
                     ):
                         merged[-1]["gids"].extend(span["gids"])
+                        merged[-1].setdefault("advances", []).extend(span.get("advances", []))
                         merged[-1]["text"] += span["text"]
                         merged[-1]["end"] = max(merged[-1]["end"], span["end"])
-                    else:
-                        merged.append(dict(span, gids=list(span["gids"])))
-                parts = []
-                previous = None
-                for span in merged:
-                    if span["xref"]:
-                        mapping = maps[span["xref"]]
-                        decoded = decode_glyph_stream(span["gids"], mapping)
-                        verified = verify_roundtrip(decoded.text, span["gids"], mapping)
-                        text = decoded.text
-                        page_report["total_glyphs"] += decoded.total_glyphs
-                        page_report["unknown_count"] += decoded.unknown_count
-                        page_report["matching_glyphs"] += verified.matching_glyphs
-                        page_report["compared_glyphs"] += verified.compared_glyphs
-                        page_report["runs"].append(
-                            {
-                                "font_xref": span["xref"],
-                                "x": span["x"],
-                                "y": span["y"],
-                                "total_glyphs": decoded.total_glyphs,
-                                "unknown_count": decoded.unknown_count,
-                                **asdict(verified),
-                            }
+                        box = merged[-1]["bbox"]
+                        merged[-1]["bbox"] = (
+                            min(box[0], span["bbox"][0]),
+                            min(box[1], span["bbox"][1]),
+                            max(box[2], span["bbox"][2]),
+                            max(box[3], span["bbox"][3]),
                         )
                     else:
-                        text = span["text"]
-                    if (
-                        previous is not None
-                        and parts
-                        and not parts[-1].endswith(" ")
-                        and not text.startswith(" ")
-                    ):
-                        gap = span["x"] - previous["end"]
-                        if gap > max(1, span["size"] * 0.15):
-                            parts.append("\t" if gap > span["size"] * 2 else " ")
-                    parts.append(text)
-                    previous = span
-                line_text = "".join(parts).rstrip()
-                lines.append(line_text)
-                # One block per visual baseline row, sharing the text recovery's
-                # reading order and whitespace. Keep the leading run's font.
-                blocks.append(
-                    TextBlock(
-                        raw_text=line_text,
-                        unicode_text=line_text,
-                        position=BoundingBox(
-                            min(s["bbox"][0] for s in line),
-                            min(s["bbox"][1] for s in line),
-                            max(s["bbox"][2] for s in line),
-                            max(s["bbox"][3] for s in line),
-                        ),
-                        font_name=line[0]["font_name"],
-                        font_size=line[0]["size"],
-                        detected_encoding="glyph-id" if any(s["xref"] for s in line) else "unicode",
-                    )
+                        merged.append(dict(span, gids=list(span["gids"])))
+                lines.append(merged)
+            page_data.append((page.number + 1, page.rect.width, page.rect.height, lines))
+        # One map at a time. Reports retain diagnostics, never mapping tables.
+        for candidate in candidates:
+            descriptor = _reference(doc, _descendant(doc, candidate.xref), "FontDescriptor")
+            ref = _reference(doc, descriptor, "FontFile2") or _reference(
+                doc, descriptor, "FontFile3"
+            )
+            mapping = build_glyph_map(budget.stream(doc, ref))
+            inferred_entries = {
+                r["codepoint"] for r in mapping.cmap_repairs if r["source"].startswith("inferred")
+            }
+            for _number, _, _, lines in page_data:
+                for line in lines:
+                    for span in line:
+                        if span["xref"] != candidate.xref:
+                            continue
+                        decoded = decode_glyph_stream(
+                            span["gids"], mapping, advances=span.get("advances")
+                        )
+                        used = {f"U+{ord(c):04X}" for c in decoded.text} & inferred_entries
+                        if used and strict_cmap:
+                            raise ValueError(
+                                "Strict cmap refuses inferred mappings: " + ", ".join(sorted(used))
+                            )
+                        inferred.update(used)
+                        warnings.extend(decoded.warnings)
+                        span["text"] = decoded.text
+                        span["metrics"] = {
+                            "font_xref": candidate.xref,
+                            "x": span["x"],
+                            "y": span["y"],
+                            "total_glyphs": decoded.total_glyphs,
+                            "unknown_count": decoded.unknown_count,
+                            **asdict(
+                                verify_roundtrip(
+                                    decoded.text, span["gids"], mapping, _budget=budget
+                                )
+                            ),
+                        }
+            font_reports.append(
+                {
+                    **asdict(candidate),
+                    "font_hash": mapping.font_hash,
+                    "map_entries": len(mapping.mapping),
+                    "estimated_map_bytes": mapping.estimated_bytes,
+                    "build_seconds": mapping.build_seconds,
+                    "on_demand_seconds": mapping.on_demand_seconds,
+                    "collisions": mapping.collisions,
+                    "cmap_repairs": mapping.cmap_repairs,
+                    "skipped": mapping.skipped,
+                    "gsub_features": mapping.gsub_features,
+                }
+            )
+            del mapping
+    if inferred:
+        warnings.append(
+            {
+                "code": "inferred-cmap",
+                "message": "Output uses inferred cmap mappings; round-trip agreement does not establish correctness.",
+                "codepoints": sorted(inferred),
+            }
+        )
+    texts = []
+    reports = []
+    recovered_pages = []
+    for number, width, height, lines in page_data:
+        blocks = []
+        runs = []
+        for line in lines:
+            parts: list[str] = []
+            previous = None
+            for span in line:
+                text = span["text"]
+                if (
+                    previous is not None
+                    and parts
+                    and not parts[-1].endswith(" ")
+                    and not text.startswith(" ")
+                ):
+                    gap = span["x"] - previous["end"]
+                    if gap > max(1, span["size"] * 0.15):
+                        parts.append("\t" if gap > span["size"] * 2 else " ")
+                parts.append(text)
+                previous = span
+                if "metrics" in span:
+                    runs.append(span["metrics"])
+            text = "".join(parts).rstrip()
+            blocks.append(
+                TextBlock(
+                    raw_text=text,
+                    unicode_text=text,
+                    position=BoundingBox(
+                        min(s["bbox"][0] for s in line),
+                        min(s["bbox"][1] for s in line),
+                        max(s["bbox"][2] for s in line),
+                        max(s["bbox"][3] for s in line),
+                    ),
+                    font_name=line[0]["font_name"],
+                    font_size=line[0]["size"],
+                    detected_encoding="glyph-id" if any(s["xref"] for s in line) else "unicode",
                 )
-            recovered_pages.append(
-                PDFPage(page.number + 1, blocks, page.rect.width, page.rect.height)
             )
-            page_text = "\n".join(lines)
-            page_report["roundtrip_match_ratio"] = (
-                page_report["matching_glyphs"] / page_report["compared_glyphs"]
-                if page_report["compared_glyphs"]
-                else 1
-            )
-            ratio, issues = _well_formedness(page_text)
-            page_report["well_formedness_ratio"] = ratio
-            page_report["well_formedness_issues"] = issues
-            texts.append(page_text)
-            pages.append(page_report)
+        page = PDFPage(number, blocks, width, height)
+        recovered_pages.append(page)
+        texts.append(page.unicode_text)
+        metrics = {
+            key: sum(r[key] for r in runs)
+            for key in ("total_glyphs", "unknown_count", "matching_glyphs", "compared_glyphs")
+        }
+        ratio, issues = _well_formedness(page.unicode_text)
+        reports.append(
+            {
+                "page": number,
+                **metrics,
+                "runs": runs,
+                "roundtrip_match_ratio": metrics["matching_glyphs"] / metrics["compared_glyphs"]
+                if metrics["compared_glyphs"]
+                else 1,
+                "well_formedness_ratio": ratio,
+                "well_formedness_issues": issues,
+            }
+        )
     text = "\n\f\n".join(texts) + "\n"
-    total = sum(p["total_glyphs"] for p in pages)
-    unknown = sum(p["unknown_count"] for p in pages)
-    compared = sum(p["compared_glyphs"] for p in pages)
+    total = sum(p["total_glyphs"] for p in reports)
+    unknown = sum(p["unknown_count"] for p in reports)
+    compared = sum(p["compared_glyphs"] for p in reports)
     report = {
         "source": str(pdf_path),
         "script": "telugu",
@@ -959,44 +1242,34 @@ def recover_pdf(pdf_path: str | Path, *, page_numbers: set[int] | None = None) -
         "total_glyphs": total,
         "unknown_count": unknown,
         "glyph_coverage": 1 - unknown / total if total else 1,
-        "roundtrip_match_ratio": sum(p["matching_glyphs"] for p in pages) / compared
+        "roundtrip_match_ratio": sum(p["matching_glyphs"] for p in reports) / compared
         if compared
         else 1,
         "well_formedness_ratio": _well_formedness(text)[0],
-        "collisions": sum(len(m.collisions) for m in maps.values()),
+        "collisions": sum(len(f["collisions"]) for f in font_reports),
         "inferred_cmap_entries": sum(
-            sum(r["source"].startswith("inferred") for r in m.cmap_repairs) for m in maps.values()
+            sum(r["source"].startswith("inferred") for r in f["cmap_repairs"]) for f in font_reports
         ),
         "map_build_seconds": sum(
-            m.build_seconds for m in {m.font_hash: m for m in maps.values()}.values()
+            f["build_seconds"] for f in {f["font_hash"]: f for f in font_reports}.values()
         ),
-        "fonts": [
-            {
-                **asdict(f),
-                "font_hash": maps[f.xref].font_hash,
-                "map_entries": len(maps[f.xref].mapping),
-                "build_seconds": maps[f.xref].build_seconds,
-                "on_demand_seconds": maps[f.xref].on_demand_seconds,
-                "collisions": maps[f.xref].collisions,
-                "cmap_repairs": maps[f.xref].cmap_repairs,
-                "skipped": maps[f.xref].skipped,
-                "gsub_features": maps[f.xref].gsub_features,
-            }
-            for f in candidates
-        ],
-        "pages": pages,
+        "fonts": font_reports,
+        "pages": reports,
+        "warnings": warnings,
+        "inferred_codepoints": sorted(inferred),
         "limitations": [
-            "Glyph equivalence does not establish original spelling or linguistic accuracy.",
-            "Reading order uses approximate horizontal baseline rows, not semantic table/column reconstruction.",
-            "Scores cover candidate fonts only; ordinary fonts retain MuPDF Unicode extraction.",
-            "Some cmap repairs infer Unicode order between known anchors; see cmap_repairs and skipped codepoints.",
-            "Terminal virama is flagged for review, including legitimate loanwords and abbreviations.",
+            "Round-trip is internal consistency, not semantic verification.",
+            "Invisible (Tr 3) and clipping-only (Tr 7) text is excluded.",
+            "ZWJ/ZWNJ cannot be distinguished when their glyphs and advances coincide.",
+            "Reading order uses approximate horizontal baseline rows.",
         ],
     }
-    return RecoveryResult(text, report, recovered_pages)
+    return RecoveryResult(text, report, recovered_pages, warnings, sorted(inferred))
 
 
-def recover_document(document: PDFDocument, page_numbers: set[int]) -> PDFDocument:
+def recover_document(
+    document: PDFDocument, page_numbers: set[int], *, strict_cmap: bool = False
+) -> PDFDocument:
     """Recover selected pages as positioned blocks; retain all other pages.
 
     Blocks follow the same approximate visual lines as ``recover_pdf``. Each
@@ -1005,6 +1278,11 @@ def recover_document(document: PDFDocument, page_numbers: set[int]) -> PDFDocume
     """
     if not page_numbers:
         return document
-    result = recover_pdf(document.filepath, page_numbers=page_numbers)
+    result = recover_pdf(document.filepath, page_numbers=page_numbers, strict_cmap=strict_cmap)
     pages = {page.page_number: page for page in result.pages}
-    return replace(document, pages=[pages.get(page.page_number, page) for page in document.pages])
+    return replace(
+        document,
+        pages=[pages.get(page.page_number, page) for page in document.pages],
+        warnings=result.warnings,
+        inferred_codepoints=result.inferred_codepoints,
+    )

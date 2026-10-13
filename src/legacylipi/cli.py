@@ -177,7 +177,11 @@ def ui():
     is_flag=True,
     help="Generate bilingual side-by-side output (Markdown format, ignores --format).",
 )
+@click.option(
+    "--strict-cmap", is_flag=True, help="Refuse recovery that uses inferred cmap mappings."
+)
 def translate(
+    strict_cmap: bool,
     input_file: Path,
     output: Path | None,
     output_format: str,
@@ -329,7 +333,9 @@ def translate(
                     document,
                     encoding_result,
                     page_encodings=page_encodings,
+                    strict_cmap=strict_cmap,
                 )
+                _show_recovery_warnings(converted_doc.warnings)
                 progress.update(task, description="[green]✓[/green] Converted to Unicode")
 
             # Step 4: Translate (if enabled)
@@ -377,6 +383,11 @@ def translate(
                                 target_lang=target_lang,
                             )
                         )
+                        for block in blocks:
+                            if block.translation_error:
+                                console.print(
+                                    f"[yellow]Warning: block translation failed: {block.translation_error}; source text retained.[/yellow]"
+                                )
                     else:
                         structure_preserving = False
                 else:
@@ -561,7 +572,11 @@ def translate(
     default=None,
     help="Force specific encoding.",
 )
+@click.option(
+    "--strict-cmap", is_flag=True, help="Refuse recovery that uses inferred cmap mappings."
+)
 def convert(
+    strict_cmap: bool,
     input_file: Path,
     output: Path | None,
     encoding: str | None,
@@ -607,8 +622,9 @@ def convert(
             # Convert to Unicode
             converter = UnicodeConverter()
             converted_doc = converter.convert_with_recovery(
-                document, encoding_result, page_encodings
+                document, encoding_result, page_encodings, strict_cmap=strict_cmap
             )
+            _show_recovery_warnings(converted_doc.warnings)
 
             # Output
             generator = OutputGenerator(include_metadata=True)
@@ -670,7 +686,11 @@ def convert(
     is_flag=True,
     help="Suppress progress output.",
 )
+@click.option(
+    "--strict-cmap", is_flag=True, help="Refuse recovery that uses inferred cmap mappings."
+)
 def extract(
+    strict_cmap: bool,
     input_file: Path,
     output: Path | None,
     output_format: str,
@@ -815,7 +835,9 @@ def extract(
                     document,
                     encoding_result,
                     page_encodings=page_encodings,
+                    strict_cmap=strict_cmap,
                 )
+                _show_recovery_warnings(converted_doc.warnings)
                 progress.update(task, description="[green]✓[/green] Converted to Unicode")
 
             # Generate output (no translation)
@@ -949,11 +971,40 @@ def detect(input_file: Path, verbose: bool):
         sys.exit(1)
 
 
+def _show_recovery_warnings(warnings: list[dict]) -> None:
+    for warning in warnings:
+        console.print(
+            f"[yellow]Warning: {warning['message']} {', '.join(warning.get('codepoints', []))}[/yellow]"
+        )
+
+
+def _atomic_text(path: Path, text: str) -> None:
+    import os
+    import tempfile
+
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=path.parent, delete=False
+        ) as handle:
+            temporary = Path(handle.name)
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
 @main.command("recover-text")
 @click.argument("input_file", type=click.Path(exists=True, dir_okay=False, path_type=Path))
 @click.option("-o", "--output", required=True, type=click.Path(dir_okay=False, path_type=Path))
 @click.option("--report", "report_path", type=click.Path(dir_okay=False, path_type=Path))
-def recover_text(input_file: Path, output: Path, report_path: Path | None):
+@click.option(
+    "--strict-cmap", is_flag=True, help="Refuse recovery that uses inferred cmap mappings."
+)
+def recover_text(input_file: Path, output: Path, report_path: Path | None, strict_cmap: bool):
     """Recover Telugu Unicode from embedded glyph-ID fonts without ToUnicode.
 
     Writes a JSON report beside OUTPUT unless --report selects another path.
@@ -963,15 +1014,27 @@ def recover_text(input_file: Path, output: Path, report_path: Path | None):
     from legacylipi.core.glyph_recovery import recover_pdf
 
     report_path = report_path or output.with_suffix(".report.json")
-    paths = [input_file.resolve(), output.resolve(), report_path.resolve()]
-    if len(set(paths)) != 3:
-        raise click.ClickException("Input, output and report paths must be different.")
+    paths = [input_file, output, report_path]
     try:
-        recovered = recover_pdf(input_file)
-        output.write_text(recovered.text, encoding="utf-8")
-        report_path.write_text(
-            json.dumps(recovered.report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-        )
+        for i, path in enumerate(paths):
+            for other in paths[i + 1 :]:
+                if path.resolve() == other.resolve() or (
+                    path.exists() and other.exists() and path.samefile(other)
+                ):
+                    raise ValueError(
+                        "Input, output and report paths must be different (including inode aliases)."
+                    )
+        for path in (output, report_path):
+            if path.exists():
+                with path.open("rb") as handle:
+                    if b"%PDF-" in handle.read(1024):
+                        raise ValueError(
+                            "Refusing to overwrite an existing PDF, regardless of extension."
+                        )
+        recovered = recover_pdf(input_file, strict_cmap=strict_cmap)
+        _show_recovery_warnings(recovered.warnings)
+        _atomic_text(output, recovered.text)
+        _atomic_text(report_path, json.dumps(recovered.report, ensure_ascii=False, indent=2) + "\n")
     except (ImportError, ValueError, OSError, RuntimeError) as exc:
         raise click.ClickException(str(exc)) from exc
     report = recovered.report

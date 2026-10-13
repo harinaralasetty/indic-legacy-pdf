@@ -330,6 +330,12 @@ class UnicodeConverter:
         converted_blocks = []
         for block in page.text_blocks:
             block_encoding = encoding or block.detected_encoding
+            if encoding_name is None:
+                from legacylipi.core.encoding_detector import EncodingDetector
+
+                font_result = EncodingDetector().detect_from_font_name(block.font_name or "")
+                if font_result:
+                    block_encoding = font_result.detected_encoding
             converted_block = self.convert_text_block(block, block_encoding)
             converted_blocks.append(converted_block)
 
@@ -345,6 +351,8 @@ class UnicodeConverter:
         document: PDFDocument,
         encoding_result: EncodingDetectionResult,
         page_encodings: dict[int, EncodingDetectionResult],
+        *,
+        strict_cmap: bool = False,
     ) -> PDFDocument:
         """Recover glyph-ID pages, otherwise use the existing conversion path."""
         if encoding_result.detected_encoding != "glyph-id":
@@ -352,11 +360,16 @@ class UnicodeConverter:
 
         from legacylipi.core.glyph_recovery import recover_document
 
-        recovered = recover_document(document, set(page_encodings))
+        selected = {
+            n for n, result in page_encodings.items() if result.detected_encoding == "glyph-id"
+        }
+        recovered = recover_document(document, selected, strict_cmap=strict_cmap)
         return replace(
             recovered,
             pages=[
-                page if page.page_number in page_encodings else self.convert_page(page)
+                page
+                if page.page_number in selected
+                else self.convert_page(page, page_encoding=page_encodings.get(page.page_number))
                 for page in recovered.pages
             ],
         )

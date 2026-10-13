@@ -25,7 +25,6 @@ from legacylipi.core.glyph_recovery import (
     verify_roundtrip,
 )
 from legacylipi.core.pdf_parser import parse_pdf
-
 from tests.glyph_helpers import FONT, LINES, make_pdf, shape
 
 

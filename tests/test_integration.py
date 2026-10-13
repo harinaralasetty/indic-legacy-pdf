@@ -245,7 +245,7 @@ class TestTranslationPipeline:
         pdf_path = test_pdf_dir / "backends.pdf"
         create_simple_pdf(pdf_path, "Backend test.")
 
-        document = parse_pdf(pdf_path)
+        parse_pdf(pdf_path)
 
         # Test mock backend
         mock_translator = create_translator("mock")
@@ -364,7 +364,7 @@ class TestRealPDFWithLegacyEncoding:
         assert len(page_encodings) > 0
 
         # Check that different encodings are detected for different pages
-        encodings_found = set(r.detected_encoding for r in page_encodings.values())
+        encodings_found = {r.detected_encoding for r in page_encodings.values()}
         # We expect both unicode-devanagari and dvb-tt to be detected
         assert "dvb-tt" in encodings_found or "unicode-devanagari" in encodings_found
 
@@ -406,7 +406,6 @@ class TestRealPDFWithLegacyEncoding:
 
         # The word "महाराष्ट्र" (Maharashtra) should appear in the output
         # Either directly or we should NOT see the garbled form "´ÖÆüÖ¸üÖÂ™Òü"
-        garbled_form = "´ÖÆüÖ¸üÖÂ™Òü"
 
         # After conversion, we should not see the garbled legacy-encoded form
         # (though it might still appear on Unicode pages that weren't converted)
@@ -429,7 +428,7 @@ class TestRealPDFWithLegacyEncoding:
         converted_doc = converter.convert_document(document, page_encodings=page_encodings)
 
         # Check each page has some content after conversion
-        for page in converted_doc.pages:
+        for _page in converted_doc.pages:
             # Pages should have text blocks
             # (some may be empty depending on the PDF structure)
             pass  # Just verifying no exceptions during conversion

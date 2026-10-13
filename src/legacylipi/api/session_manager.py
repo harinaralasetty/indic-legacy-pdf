@@ -29,6 +29,8 @@ class SessionData:
     # Result
     result_bytes: bytes | None = None
     result_filename: str | None = None
+    warnings: list[dict] = field(default_factory=list)
+    inferred_codepoints: list[str] = field(default_factory=list)
 
 
 class SessionManager:
@@ -101,13 +103,23 @@ class SessionManager:
                 return True
             return False
 
-    async def set_result(self, session_id: str, result_bytes: bytes, result_filename: str) -> bool:
+    async def set_result(
+        self,
+        session_id: str,
+        result_bytes: bytes,
+        result_filename: str,
+        *,
+        warnings: list[dict] | None = None,
+        inferred_codepoints: list[str] | None = None,
+    ) -> bool:
         """Store processing results for a session."""
         async with self._lock:
             session = self._sessions.get(session_id)
             if session:
                 session.result_bytes = result_bytes
                 session.result_filename = result_filename
+                session.warnings = warnings or []
+                session.inferred_codepoints = inferred_codepoints or []
                 session.is_processing = False
                 return True
             return False

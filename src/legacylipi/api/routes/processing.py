@@ -29,8 +29,17 @@ async def _run_pipeline(session_manager: SessionManager, session_id: str, coro):
         return
 
     try:
-        result_bytes, result_filename = await coro
-        await session_manager.set_result(session_id, result_bytes, result_filename)
+        result = await coro
+        result_bytes, result_filename = result
+        warnings = getattr(result, "warnings", [])
+        inferred_codepoints = getattr(result, "inferred_codepoints", [])
+        await session_manager.set_result(
+            session_id,
+            result_bytes,
+            result_filename,
+            warnings=warnings,
+            inferred_codepoints=inferred_codepoints,
+        )
 
         await session.progress_queue.put(
             ProgressEvent(
@@ -40,6 +49,8 @@ async def _run_pipeline(session_manager: SessionManager, session_id: str, coro):
                 message="Done!",
                 filename=result_filename,
                 file_size=len(result_bytes),
+                warnings=warnings,
+                inferred_codepoints=inferred_codepoints,
             )
         )
     except Exception as e:

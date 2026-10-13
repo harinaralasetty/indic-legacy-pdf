@@ -1286,6 +1286,8 @@ class TranslationEngine:
         if not translatable_blocks:
             return blocks
 
+        for block in translatable_blocks:
+            block.translation_error = None
         semaphore = asyncio.Semaphore(max_concurrent)
         completed = 0
         total = len(translatable_blocks)
@@ -1307,6 +1309,7 @@ class TranslationEngine:
 
                         logging.warning(f"Translation failed for block {index + 1}: {e}")
                         block.translated_text = text
+                        block.translation_error = str(e)
                         failed_blocks.append((index + 1, str(e)))
                 else:
                     block.translated_text = text or ""
@@ -1322,6 +1325,12 @@ class TranslationEngine:
         # Translate all blocks concurrently (with semaphore limiting)
         await asyncio.gather(*[translate_single(b, i) for i, b in enumerate(translatable_blocks)])
 
+        # Refuse output when at least half of nonempty blocks failed.
+        # Partial failures remain explicit on each block for CLI/API reporting.
+        if failed_blocks and len(failed_blocks) / total >= 0.5:
+            raise TranslationError(
+                f"Translation failed for {len(failed_blocks)}/{total} blocks (failure threshold 50%). First error: {failed_blocks[0][1]}"
+            )
         # Report failed blocks to user via logging
         if failed_blocks:
             import logging

@@ -130,14 +130,19 @@ defaults to Telugu (`te`); `--source-lang` overrides it. `convert` and `extract`
 also recover automatically. Use `recover-text` for the detailed recovery report.
 
 `detect` flags `glyph-id` only when fontTools verifies Telugu support and page
-text uses those fonts; existing legacy font-name detection takes precedence.
+text uses those fonts; used legacy fonts take precedence on their own pages.
 Recovery reports unknown glyphs, collisions, cmap repairs and per-page reshaping
 checks. Round-trip = internal consistency of reading order/whitespace/ambiguity;
 it does NOT verify that inferred cmap mappings are correct. Shaping builds the
-map and also checks it. Inferred entries are listed in the report and were
-spot-checked visually against page renders for the Gautami sample only.
+map and also checks it. Inferred entries actually used in output trigger visible CLI warnings and structured
+API/session warnings. `--strict-cmap` refuses such recovery (API: `strict_cmap=true`).
+Manual comparison was done once on one page region by a reviewer, not reproducible
+from the repository; the repository evidence is synthetic ground-truth tests.
 The JSON `verification_note` and CLI footer explain this limit; inserted layout
 whitespace and order between runs are not checked.
+Invisible and clip-only text is excluded; fill+stroke is deduplicated. Telugu PDF
+output uses HarfBuzz through `insert_htmlbox`. Recovery has explicit CPU/font/memory
+budgets; joiner ambiguity is reported.
 See [glyph recovery and its limits](docs/glyph-recovery.md).
 
 ## Web UI
