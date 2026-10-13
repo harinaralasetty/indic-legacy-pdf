@@ -1,0 +1,2166 @@
+{
+  "table": {
+    "T": "ు",
+    "plus": "ం",
+    "s": "ర",
+    "udieresis": "",
+    "periodcentered": "",
+    "oslash": "క",
+    "e": "వ",
+    "backslash": "ల",
+    "q": "న",
+    "bar": "ప",
+    "quoteleft": "త",
+    "less": "ద",
+    "period": ".",
+    "sterling": "",
+    "ampersand": "డ",
+    "ecircumflex": "ా",
+    "exclamdown": "",
+    "greater": "గ",
+    "d": "స",
+    "adieresis": "",
+    "numbersign": "చ",
+    "Eacute": "",
+    "igrave": "ని",
+    "lessequal": "ా",
+    "hungarumlaut": "ల",
+    "divide": "ూ",
+    "n": "అ",
+    "j": "య",
+    "Oacute": "ె",
+    "Idieresis": "ి",
+    "summation": "",
+    "approxequal": "క",
+    "ring": "ే",
+    "y": "వ",
+    "H": "న",
+    "comma": ",",
+    "idieresis": "్న",
+    "plusminus": "ా",
+    "Otilde": "ా",
+    "b": "ప",
+    "acute": "్య",
+    "icircumflex": "ు",
+    "greaterequal": "ట",
+    "asciitilde": "ది",
+    "Aacute": "్ర",
+    "Agrave": "ో",
+    "Ucircumflex": "",
+    "ae": "ి",
+    "braceleft": "ట",
+    "bracketright": "రి",
+    "radical": "ో",
+    "u": "బ",
+    "cent": "్ల",
+    "dollar": "వి",
+    "Ocircumflex": "్త",
+    "edieresis": "ా",
+    "integral": "చి",
+    "ccedilla": "ి",
+    "ordmasculine": "్ట",
+    "fraction": "ు",
+    "ntilde": "ఉ",
+    "Adieresis": "ఆ",
+    "X": "శ",
+    "asterisk": "లి",
+    "agrave": "్మ",
+    "equal": "ొ",
+    "parenright": ")",
+    "Ccedilla": "ఇ",
+    "parenleft": "(",
+    "macron": "",
+    "ydieresis": "్క",
+    "k": "స",
+    "mu": "’",
+    "ordfeminine": "‘",
+    "atilde": "బ",
+    "V": "హ",
+    "guillemotright": "జ",
+    "guillemotleft": "్వ",
+    "R": "=",
+    "ocircumflex": "ె",
+    "Ograve": "ే",
+    "m": "ఎ",
+    "quoteright": "ై",
+    "Atilde": "్చ",
+    "guilsinglleft": "తి",
+    "circumflex": "",
+    "D": "ణ",
+    "endash": "గి",
+    "OE": "్ప",
+    "ogonek": "ో",
+    "ugrave": "ే",
+    "exclam": "!",
+    "Udieresis": "ా",
+    "dotaccent": "నీ",
+    "fi": "ళ",
+    "M": "వీ",
+    "one": "1",
+    "Ecircumflex": "ా",
+    "w": "ష",
+    "ellipsis": "ె",
+    "C": "జ",
+    "pi": "ే",
+    "Ntilde": "భ",
+    "two": "2",
+    "florin": "ఠ",
+    "fl": "్ళ",
+    "daggerdbl": "్స",
+    "aacute": "ఈ",
+    "uacute": "్థ",
+    "question": "?",
+    "f": "ట",
+    "dotlessi": "ొ",
+    "eacute": "్",
+    "Y": "ర్",
+    "caron": "ఒ",
+    "logicalnot": "ె",
+    "four": "4",
+    "L": "ూ",
+    "guilsinglright": "్ద",
+    "three": "3",
+    "at": "ఏ",
+    "apple": "్పు",
+    "section": "ొ",
+    "Z": "్గ",
+    "five": "5",
+    "r": "తీ",
+    "otilde": "జి",
+    "K": "ఖ",
+    "colon": ":",
+    "egrave": "ృ",
+    "bullet": "శి",
+    "ograve": "ఫ",
+    "asciicircum": "గీ",
+    "E": "జు",
+    "grave": "–",
+    "B": "దీ",
+    "product": "థ",
+    "aring": "్ష",
+    "quotedblright": "ీ",
+    "oacute": "ు",
+    "Ydieresis": "్",
+    "P": "ూ",
+    "underscore": "బి",
+    "Delta": "్ధ",
+    "slash": "/",
+    "braceright": "ఊ",
+    "Oslash": "రీ",
+    "perthousand": "ా",
+    "AE": "ై",
+    "zero": "0",
+    "degree": "ీ",
+    "t": "్",
+    "c": "ష",
+    "quotedblleft": "్బ",
+    "Ugrave": "ర్శ",
+    "paragraph": "్డ",
+    "lozenge": "ఐ",
+    "six": "6",
+    "bracketleft": "ళి",
+    "nine": "9",
+    "h": "ష్ట్",
+    "p": "జూ",
+    "seven": "7",
+    "cedilla": "్ష",
+    "eight": "8",
+    "registered": "్జ",
+    "iacute": "్ణ",
+    "z": "ఓ",
+    "quotedbl": "",
+    "currency": "",
+    "quotedblbase": "్ఞ",
+    "odieresis": "ౌ",
+    "germandbls": "ు",
+    "o": "శీర",
+    "l": "శ్రీ",
+    "Q": "ు",
+    "infinity": "ళీ",
+    "yen": "్",
+    "U": "ఖ",
+    "breve": "్",
+    "dieresis": "హో",
+    "quotesinglbase": "ే",
+    "i": "అ",
+    "Aring": "్",
+    "semicolon": "బీ",
+    "J": "జీ",
+    "copyright": "లీ",
+    "oe": "ఖి",
+    "N": "చీ",
+    "Icircumflex": "్ష్మ",
+    "Acircumflex": "ౌ",
+    "ucircumflex": "ీ",
+    "g": "్త్ర",
+    "tilde": "్ఠ",
+    "F": "ఖీ",
+    "Omega": "్హ",
+    "emdash": "",
+    "Igrave": "ై",
+    "Edieresis": "ె",
+    "A": "ూ",
+    "Iacute": "ౌ",
+    "W": "ఔ",
+    "S": "ూ",
+    "Odieresis": "ౌ",
+    "notequal": "ు",
+    "Uacute": "ౌ",
+    "partialdiff": "ూ",
+    "a": "",
+    "questiondown": "",
+    "quotesingle": ""
+  },
+  "multi_glyph_units": [
+    {
+      "glyphs": [
+        "e",
+        "T"
+      ],
+      "unicode": "మ",
+      "support": 25,
+      "ids": [
+        "W0020",
+        "W0035",
+        "W0060",
+        "W0109",
+        "W0154",
+        "W0183",
+        "W0188",
+        "W0299",
+        "W0389",
+        "W0435",
+        "W0439",
+        "W0460",
+        "W0519",
+        "W0739",
+        "W0848",
+        "W0935",
+        "W0994",
+        "W1059",
+        "W1136",
+        "W1223",
+        "W1229",
+        "W1305",
+        "W1344",
+        "W1443",
+        "W1523"
+      ],
+      "discovery_support": 50,
+      "label_deviations": 2,
+      "alignment_cost_gain": 7.67776,
+      "emission_cost": 4.5
+    },
+    {
+      "glyphs": [
+        "dollar",
+        "T"
+      ],
+      "unicode": "మి",
+      "support": 13,
+      "ids": [
+        "W0090",
+        "W0107",
+        "W0227",
+        "W0460",
+        "W0501",
+        "W0743",
+        "W0822",
+        "W0839",
+        "W1095",
+        "W1278",
+        "W1443",
+        "W1458",
+        "W1541"
+      ],
+      "discovery_support": 13,
+      "label_deviations": 2,
+      "alignment_cost_gain": 7.413639,
+      "emission_cost": 4.5
+    },
+    {
+      "glyphs": [
+        "e",
+        "divide"
+      ],
+      "unicode": "మా",
+      "support": 11,
+      "ids": [
+        "W0034",
+        "W0227",
+        "W0344",
+        "W0520",
+        "W0659",
+        "W0665",
+        "W0697",
+        "W0718",
+        "W0847",
+        "W1307",
+        "W1466"
+      ],
+      "discovery_support": 11,
+      "label_deviations": 1,
+      "alignment_cost_gain": 5.719975,
+      "emission_cost": 2.5
+    },
+    {
+      "glyphs": [
+        "Aacute",
+        "bar",
+        "udieresis"
+      ],
+      "unicode": "ప్ర",
+      "support": 10,
+      "ids": [
+        "W0047",
+        "W0189",
+        "W0277",
+        "W0660",
+        "W0849",
+        "W0926",
+        "W1161",
+        "W1179",
+        "W1371",
+        "W1484"
+      ],
+      "discovery_support": 10,
+      "label_deviations": 0,
+      "alignment_cost_gain": 0.876744,
+      "emission_cost": 0.5
+    },
+    {
+      "glyphs": [
+        "s",
+        "T",
+        "T"
+      ],
+      "unicode": "యి",
+      "support": 10,
+      "ids": [
+        "W0156",
+        "W0338",
+        "W0387",
+        "W0729",
+        "W1203",
+        "W1274",
+        "W1336",
+        "W1347",
+        "W1369",
+        "W1545"
+      ],
+      "discovery_support": 9,
+      "label_deviations": 3,
+      "alignment_cost_gain": 17.425472,
+      "emission_cost": 6.5
+    },
+    {
+      "glyphs": [
+        "less",
+        "Ucircumflex",
+        "adieresis"
+      ],
+      "unicode": "ధ",
+      "support": 9,
+      "ids": [
+        "W0034",
+        "W0063",
+        "W0087",
+        "W0390",
+        "W0596",
+        "W0749",
+        "W1326",
+        "W1451",
+        "W1537"
+      ],
+      "discovery_support": 9,
+      "label_deviations": 2,
+      "alignment_cost_gain": 7.754044,
+      "emission_cost": 4.5
+    },
+    {
+      "glyphs": [
+        "periodcentered",
+        "T",
+        "plus"
+      ],
+      "unicode": "ం",
+      "support": 9,
+      "ids": [
+        "W0201",
+        "W0435",
+        "W0473",
+        "W0480",
+        "W0866",
+        "W1188",
+        "W1277",
+        "W1491",
+        "W1523"
+      ],
+      "discovery_support": 9,
+      "label_deviations": 1,
+      "alignment_cost_gain": 4.490685,
+      "emission_cost": 2.5
+    },
+    {
+      "glyphs": [
+        "periodcentered",
+        "T",
+        "acute"
+      ],
+      "unicode": "్య",
+      "support": 8,
+      "ids": [
+        "W0069",
+        "W0119",
+        "W0252",
+        "W0488",
+        "W0776",
+        "W0778",
+        "W0874",
+        "W1372"
+      ],
+      "discovery_support": 8,
+      "label_deviations": 1,
+      "alignment_cost_gain": 4.491428,
+      "emission_cost": 2.5
+    },
+    {
+      "glyphs": [
+        "u",
+        "Ucircumflex",
+        "Ntilde"
+      ],
+      "unicode": "భ",
+      "support": 8,
+      "ids": [
+        "W0151",
+        "W0339",
+        "W0414",
+        "W0832",
+        "W0851",
+        "W1123",
+        "W1239",
+        "W1484"
+      ],
+      "discovery_support": 8,
+      "label_deviations": 1,
+      "alignment_cost_gain": 5.224921,
+      "emission_cost": 2.5
+    },
+    {
+      "glyphs": [
+        "j",
+        "periodcentered",
+        "T"
+      ],
+      "unicode": "య",
+      "support": 6,
+      "ids": [
+        "W0142",
+        "W0210",
+        "W0748",
+        "W0871",
+        "W1061",
+        "W1541"
+      ],
+      "discovery_support": 34,
+      "label_deviations": 1,
+      "alignment_cost_gain": 4.490007,
+      "emission_cost": 2.5
+    },
+    {
+      "glyphs": [
+        "j",
+        "periodcentered",
+        "divide"
+      ],
+      "unicode": "యా",
+      "support": 6,
+      "ids": [
+        "W0369",
+        "W0771",
+        "W0778",
+        "W1041",
+        "W1053",
+        "W1101"
+      ],
+      "discovery_support": 6,
+      "label_deviations": 0,
+      "alignment_cost_gain": 2.532223,
+      "emission_cost": 0.5
+    },
+    {
+      "glyphs": [
+        "integral",
+        "Atilde"
+      ],
+      "unicode": "చ్చి",
+      "support": 6,
+      "ids": [
+        "W0001",
+        "W0079",
+        "W1183",
+        "W1264",
+        "W1374",
+        "W1467"
+      ],
+      "discovery_support": 6,
+      "label_deviations": 1,
+      "alignment_cost_gain": 4.565882,
+      "emission_cost": 2.5
+    },
+    {
+      "glyphs": [
+        "s",
+        "Y"
+      ],
+      "unicode": "ర్",
+      "support": 6,
+      "ids": [
+        "W0087",
+        "W0381",
+        "W1046",
+        "W1067",
+        "W1126",
+        "W1272"
+      ],
+      "discovery_support": 6,
+      "label_deviations": 0,
+      "alignment_cost_gain": 4.825526,
+      "emission_cost": 0.5
+    },
+    {
+      "glyphs": [
+        "ugrave",
+        "bar"
+      ],
+      "unicode": "పే",
+      "support": 6,
+      "ids": [
+        "W0265",
+        "W0333",
+        "W0452",
+        "W0975",
+        "W1220",
+        "W1515"
+      ],
+      "discovery_support": 6,
+      "label_deviations": 0,
+      "alignment_cost_gain": 0.551447,
+      "emission_cost": 0.5
+    },
+    {
+      "glyphs": [
+        "u",
+        "Ucircumflex",
+        "lessequal"
+      ],
+      "unicode": "భా",
+      "support": 4,
+      "ids": [
+        "W0005",
+        "W0208",
+        "W0407",
+        "W1276"
+      ],
+      "discovery_support": 4,
+      "label_deviations": 1,
+      "alignment_cost_gain": 5.586212,
+      "emission_cost": 2.5
+    },
+    {
+      "glyphs": [
+        "y",
+        "Oacute",
+        "T"
+      ],
+      "unicode": "మె",
+      "support": 4,
+      "ids": [
+        "W0496",
+        "W0683",
+        "W0909",
+        "W1582"
+      ],
+      "discovery_support": 4,
+      "label_deviations": 2,
+      "alignment_cost_gain": 6.414904,
+      "emission_cost": 4.503199
+    },
+    {
+      "glyphs": [
+        "M",
+        "T"
+      ],
+      "unicode": "మీ",
+      "support": 4,
+      "ids": [
+        "W0236",
+        "W0404",
+        "W0987",
+        "W1066"
+      ],
+      "discovery_support": 4,
+      "label_deviations": 1,
+      "alignment_cost_gain": 6.74246,
+      "emission_cost": 2.5
+    },
+    {
+      "glyphs": [
+        "pi",
+        "oslash"
+      ],
+      "unicode": "కే",
+      "support": 4,
+      "ids": [
+        "W0662",
+        "W1076",
+        "W1383",
+        "W1581"
+      ],
+      "discovery_support": 4,
+      "label_deviations": 0,
+      "alignment_cost_gain": 0.66868,
+      "emission_cost": 0.5
+    },
+    {
+      "glyphs": [
+        "Aacute",
+        "quoteleft",
+        "periodcentered"
+      ],
+      "unicode": "త్ర",
+      "support": 3,
+      "ids": [
+        "W0422",
+        "W0588",
+        "W0743"
+      ],
+      "discovery_support": 3,
+      "label_deviations": 0,
+      "alignment_cost_gain": 0.838047,
+      "emission_cost": 0.5
+    },
+    {
+      "glyphs": [
+        "less",
+        "product",
+        "adieresis"
+      ],
+      "unicode": "థ",
+      "support": 3,
+      "ids": [
+        "W0760",
+        "W1079",
+        "W1278"
+      ],
+      "discovery_support": 3,
+      "label_deviations": 1,
+      "alignment_cost_gain": 6.846173,
+      "emission_cost": 2.5
+    },
+    {
+      "glyphs": [
+        "y",
+        "ring",
+        "T"
+      ],
+      "unicode": "మే",
+      "support": 3,
+      "ids": [
+        "W0120",
+        "W1458",
+        "W1507"
+      ],
+      "discovery_support": 3,
+      "label_deviations": 2,
+      "alignment_cost_gain": 6.294438,
+      "emission_cost": 4.5
+    },
+    {
+      "glyphs": [
+        "Aacute",
+        "X"
+      ],
+      "unicode": "శ్ర",
+      "support": 3,
+      "ids": [
+        "W0096",
+        "W0213",
+        "W0214"
+      ],
+      "discovery_support": 3,
+      "label_deviations": 0,
+      "alignment_cost_gain": 0.806948,
+      "emission_cost": 0.5
+    },
+    {
+      "glyphs": [
+        "bracketleft",
+        "fl"
+      ],
+      "unicode": "ళ్ళి",
+      "support": 3,
+      "ids": [
+        "W0240",
+        "W0497",
+        "W1039"
+      ],
+      "discovery_support": 3,
+      "label_deviations": 0,
+      "alignment_cost_gain": 2.628239,
+      "emission_cost": 0.5
+    },
+    {
+      "glyphs": [
+        "less",
+        "Ucircumflex"
+      ],
+      "unicode": "ధ",
+      "support": 3,
+      "ids": [
+        "W0931",
+        "W1267",
+        "W1276"
+      ],
+      "discovery_support": 12,
+      "label_deviations": 2,
+      "alignment_cost_gain": 7.751902,
+      "emission_cost": 4.5
+    },
+    {
+      "glyphs": [
+        "ocircumflex",
+        "bar"
+      ],
+      "unicode": "పె",
+      "support": 3,
+      "ids": [
+        "W0232",
+        "W0786",
+        "W0862"
+      ],
+      "discovery_support": 3,
+      "label_deviations": 0,
+      "alignment_cost_gain": 2.261621,
+      "emission_cost": 0.5
+    }
+  ],
+  "ordering_rules": [
+    {
+      "glyphs": [
+        "T"
+      ],
+      "unicode": "ు",
+      "direction": "previous",
+      "operation": "post_attach_to_prev_base",
+      "stream_position": "after_base",
+      "support": 157,
+      "opposing": 0,
+      "confidence": 1.0,
+      "ids": [
+        "W0009",
+        "W0035",
+        "W0047",
+        "W0049",
+        "W0052",
+        "W0061",
+        "W0065",
+        "W0079",
+        "W0080",
+        "W0085",
+        "W0088",
+        "W0105",
+        "W0110",
+        "W0131",
+        "W0141",
+        "W0144",
+        "W0154",
+        "W0155",
+        "W0166",
+        "W0167",
+        "W0202",
+        "W0203",
+        "W0205",
+        "W0220",
+        "W0231",
+        "W0248",
+        "W0297",
+        "W0304",
+        "W0328",
+        "W0331",
+        "W0335",
+        "W0338",
+        "W0345",
+        "W0382",
+        "W0387",
+        "W0402",
+        "W0414",
+        "W0417",
+        "W0423",
+        "W0433",
+        "W0466",
+        "W0478",
+        "W0486",
+        "W0490",
+        "W0507",
+        "W0510",
+        "W0528",
+        "W0533",
+        "W0575",
+        "W0577",
+        "W0579",
+        "W0616",
+        "W0625",
+        "W0626",
+        "W0658",
+        "W0659",
+        "W0672",
+        "W0677",
+        "W0678",
+        "W0685",
+        "W0691",
+        "W0693",
+        "W0717",
+        "W0723",
+        "W0743",
+        "W0757",
+        "W0763",
+        "W0772",
+        "W0773",
+        "W0774",
+        "W0786",
+        "W0795",
+        "W0811",
+        "W0812",
+        "W0821",
+        "W0823",
+        "W0843",
+        "W0846",
+        "W0851",
+        "W0868",
+        "W0870",
+        "W0877",
+        "W0886",
+        "W0890",
+        "W0904",
+        "W0909",
+        "W0920",
+        "W0925",
+        "W0931",
+        "W0939",
+        "W0945",
+        "W0966",
+        "W0974",
+        "W0975",
+        "W0976",
+        "W0988",
+        "W0991",
+        "W0995",
+        "W0997",
+        "W1010",
+        "W1013",
+        "W1024",
+        "W1041",
+        "W1044",
+        "W1047",
+        "W1056",
+        "W1060",
+        "W1061",
+        "W1063",
+        "W1079",
+        "W1080",
+        "W1090",
+        "W1105",
+        "W1113",
+        "W1138",
+        "W1185",
+        "W1234",
+        "W1238",
+        "W1239",
+        "W1246",
+        "W1251",
+        "W1253",
+        "W1255",
+        "W1259",
+        "W1272",
+        "W1276",
+        "W1296",
+        "W1305",
+        "W1322",
+        "W1344",
+        "W1349",
+        "W1354",
+        "W1367",
+        "W1390",
+        "W1392",
+        "W1396",
+        "W1398",
+        "W1403",
+        "W1406",
+        "W1420",
+        "W1434",
+        "W1446",
+        "W1448",
+        "W1462",
+        "W1464",
+        "W1484",
+        "W1498",
+        "W1507",
+        "W1515",
+        "W1527",
+        "W1530",
+        "W1537",
+        "W1539",
+        "W1546",
+        "W1586",
+        "W1589",
+        "W1597"
+      ]
+    },
+    {
+      "glyphs": [
+        "ecircumflex"
+      ],
+      "unicode": "ా",
+      "direction": "previous",
+      "operation": "post_attach_to_prev_base",
+      "stream_position": "after_base",
+      "support": 83,
+      "opposing": 0,
+      "confidence": 1.0,
+      "ids": [
+        "W0018",
+        "W0022",
+        "W0044",
+        "W0048",
+        "W0054",
+        "W0083",
+        "W0085",
+        "W0105",
+        "W0132",
+        "W0141",
+        "W0142",
+        "W0155",
+        "W0201",
+        "W0272",
+        "W0280",
+        "W0293",
+        "W0297",
+        "W0300",
+        "W0326",
+        "W0328",
+        "W0357",
+        "W0362",
+        "W0387",
+        "W0415",
+        "W0433",
+        "W0460",
+        "W0469",
+        "W0470",
+        "W0489",
+        "W0515",
+        "W0521",
+        "W0535",
+        "W0551",
+        "W0564",
+        "W0576",
+        "W0589",
+        "W0627",
+        "W0660",
+        "W0667",
+        "W0677",
+        "W0757",
+        "W0766",
+        "W0788",
+        "W0806",
+        "W0811",
+        "W0839",
+        "W0885",
+        "W0897",
+        "W0932",
+        "W0937",
+        "W0939",
+        "W0941",
+        "W0958",
+        "W0968",
+        "W1006",
+        "W1012",
+        "W1044",
+        "W1060",
+        "W1061",
+        "W1076",
+        "W1078",
+        "W1121",
+        "W1137",
+        "W1220",
+        "W1222",
+        "W1232",
+        "W1234",
+        "W1247",
+        "W1253",
+        "W1274",
+        "W1275",
+        "W1277",
+        "W1305",
+        "W1332",
+        "W1390",
+        "W1443",
+        "W1493",
+        "W1494",
+        "W1498",
+        "W1553",
+        "W1576",
+        "W1589",
+        "W1597"
+      ]
+    },
+    {
+      "glyphs": [
+        "Idieresis"
+      ],
+      "unicode": "ి",
+      "direction": "previous",
+      "operation": "post_attach_to_prev_base",
+      "stream_position": "after_base",
+      "support": 42,
+      "opposing": 1,
+      "confidence": 0.9767441860465116,
+      "ids": [
+        "W0029",
+        "W0076",
+        "W0107",
+        "W0137",
+        "W0168",
+        "W0176",
+        "W0195",
+        "W0225",
+        "W0238",
+        "W0246",
+        "W0329",
+        "W0357",
+        "W0377",
+        "W0378",
+        "W0397",
+        "W0419",
+        "W0451",
+        "W0463",
+        "W0470",
+        "W0482",
+        "W0594",
+        "W0667",
+        "W0679",
+        "W0875",
+        "W0906",
+        "W0988",
+        "W1024",
+        "W1053",
+        "W1059",
+        "W1121",
+        "W1177",
+        "W1181",
+        "W1230",
+        "W1294",
+        "W1306",
+        "W1332",
+        "W1408",
+        "W1453",
+        "W1518",
+        "W1524",
+        "W1525",
+        "W1555"
+      ]
+    },
+    {
+      "glyphs": [
+        "ae"
+      ],
+      "unicode": "ి",
+      "direction": "previous",
+      "operation": "post_attach_to_prev_base",
+      "stream_position": "after_base",
+      "support": 37,
+      "opposing": 0,
+      "confidence": 1.0,
+      "ids": [
+        "W0020",
+        "W0109",
+        "W0131",
+        "W0158",
+        "W0202",
+        "W0250",
+        "W0267",
+        "W0288",
+        "W0308",
+        "W0362",
+        "W0501",
+        "W0519",
+        "W0564",
+        "W0566",
+        "W0650",
+        "W0656",
+        "W0683",
+        "W0689",
+        "W0735",
+        "W0739",
+        "W0788",
+        "W0801",
+        "W0897",
+        "W0984",
+        "W1077",
+        "W1130",
+        "W1287",
+        "W1359",
+        "W1412",
+        "W1416",
+        "W1453",
+        "W1463",
+        "W1481",
+        "W1490",
+        "W1576",
+        "W1587",
+        "W1591"
+      ]
+    },
+    {
+      "glyphs": [
+        "radical"
+      ],
+      "unicode": "ో",
+      "direction": "previous",
+      "operation": "post_attach_to_prev_base",
+      "stream_position": "after_base",
+      "support": 36,
+      "opposing": 0,
+      "confidence": 1.0,
+      "ids": [
+        "W0031",
+        "W0043",
+        "W0053",
+        "W0110",
+        "W0153",
+        "W0186",
+        "W0199",
+        "W0243",
+        "W0331",
+        "W0333",
+        "W0347",
+        "W0364",
+        "W0377",
+        "W0455",
+        "W0561",
+        "W0593",
+        "W0758",
+        "W0768",
+        "W0849",
+        "W0905",
+        "W0913",
+        "W0994",
+        "W1056",
+        "W1074",
+        "W1167",
+        "W1169",
+        "W1185",
+        "W1287",
+        "W1364",
+        "W1417",
+        "W1450",
+        "W1459",
+        "W1528",
+        "W1563",
+        "W1585",
+        "W1591"
+      ]
+    },
+    {
+      "glyphs": [
+        "icircumflex"
+      ],
+      "unicode": "ు",
+      "direction": "previous",
+      "operation": "post_attach_to_prev_base",
+      "stream_position": "after_base",
+      "support": 30,
+      "opposing": 0,
+      "confidence": 1.0,
+      "ids": [
+        "W0069",
+        "W0106",
+        "W0119",
+        "W0138",
+        "W0196",
+        "W0388",
+        "W0404",
+        "W0440",
+        "W0496",
+        "W0516",
+        "W0653",
+        "W0663",
+        "W0672",
+        "W0766",
+        "W0911",
+        "W0976",
+        "W0990",
+        "W1012",
+        "W1027",
+        "W1057",
+        "W1077",
+        "W1132",
+        "W1170",
+        "W1220",
+        "W1232",
+        "W1322",
+        "W1329",
+        "W1372",
+        "W1410",
+        "W1546"
+      ]
+    },
+    {
+      "glyphs": [
+        "Oacute"
+      ],
+      "unicode": "ె",
+      "direction": "previous",
+      "operation": "post_attach_to_prev_base",
+      "stream_position": "after_base",
+      "support": 29,
+      "opposing": 0,
+      "confidence": 1.0,
+      "ids": [
+        "W0130",
+        "W0147",
+        "W0240",
+        "W0274",
+        "W0305",
+        "W0458",
+        "W0497",
+        "W0524",
+        "W0609",
+        "W0703",
+        "W0795",
+        "W0821",
+        "W0823",
+        "W0868",
+        "W0894",
+        "W0906",
+        "W0920",
+        "W0933",
+        "W0944",
+        "W1039",
+        "W1055",
+        "W1092",
+        "W1167",
+        "W1183",
+        "W1187",
+        "W1324",
+        "W1406",
+        "W1449",
+        "W1586"
+      ]
+    },
+    {
+      "glyphs": [
+        "ring"
+      ],
+      "unicode": "ే",
+      "direction": "previous",
+      "operation": "post_attach_to_prev_base",
+      "stream_position": "after_base",
+      "support": 28,
+      "opposing": 0,
+      "confidence": 1.0,
+      "ids": [
+        "W0007",
+        "W0024",
+        "W0044",
+        "W0135",
+        "W0172",
+        "W0201",
+        "W0205",
+        "W0251",
+        "W0403",
+        "W0620",
+        "W0689",
+        "W0709",
+        "W0738",
+        "W0748",
+        "W0794",
+        "W0803",
+        "W0876",
+        "W0882",
+        "W0884",
+        "W1102",
+        "W1145",
+        "W1179",
+        "W1306",
+        "W1353",
+        "W1490",
+        "W1541",
+        "W1544",
+        "W1584"
+      ]
+    },
+    {
+      "glyphs": [
+        "lessequal"
+      ],
+      "unicode": "ా",
+      "direction": "previous",
+      "operation": "post_attach_to_prev_base",
+      "stream_position": "after_base",
+      "support": 26,
+      "opposing": 0,
+      "confidence": 1.0,
+      "ids": [
+        "W0068",
+        "W0129",
+        "W0253",
+        "W0280",
+        "W0306",
+        "W0325",
+        "W0326",
+        "W0353",
+        "W0405",
+        "W0423",
+        "W0533",
+        "W0675",
+        "W0711",
+        "W0750",
+        "W0869",
+        "W1005",
+        "W1078",
+        "W1181",
+        "W1232",
+        "W1239",
+        "W1255",
+        "W1294",
+        "W1295",
+        "W1461",
+        "W1553",
+        "W1555"
+      ]
+    },
+    {
+      "glyphs": [
+        "edieresis"
+      ],
+      "unicode": "ా",
+      "direction": "previous",
+      "operation": "post_attach_to_prev_base",
+      "stream_position": "after_base",
+      "support": 24,
+      "opposing": 0,
+      "confidence": 1.0,
+      "ids": [
+        "W0080",
+        "W0099",
+        "W0194",
+        "W0195",
+        "W0198",
+        "W0418",
+        "W0429",
+        "W0431",
+        "W0710",
+        "W0763",
+        "W0799",
+        "W0948",
+        "W1128",
+        "W1140",
+        "W1170",
+        "W1267",
+        "W1280",
+        "W1341",
+        "W1392",
+        "W1408",
+        "W1426",
+        "W1433",
+        "W1459",
+        "W1592"
+      ]
+    },
+    {
+      "glyphs": [
+        "divide"
+      ],
+      "unicode": "ూ",
+      "direction": "previous",
+      "operation": "post_attach_to_prev_base",
+      "stream_position": "after_base",
+      "support": 18,
+      "opposing": 0,
+      "confidence": 1.0,
+      "ids": [
+        "W0005",
+        "W0020",
+        "W0159",
+        "W0288",
+        "W0394",
+        "W0484",
+        "W0576",
+        "W0629",
+        "W0650",
+        "W0656",
+        "W0724",
+        "W0735",
+        "W0761",
+        "W0844",
+        "W1219",
+        "W1282",
+        "W1380",
+        "W1534"
+      ]
+    },
+    {
+      "glyphs": [
+        "Otilde"
+      ],
+      "unicode": "ా",
+      "direction": "previous",
+      "operation": "post_attach_to_prev_base",
+      "stream_position": "after_base",
+      "support": 17,
+      "opposing": 1,
+      "confidence": 0.9444444444444444,
+      "ids": [
+        "W0069",
+        "W0075",
+        "W0088",
+        "W0132",
+        "W0488",
+        "W0493",
+        "W0712",
+        "W0885",
+        "W0923",
+        "W0931",
+        "W0997",
+        "W1023",
+        "W1067",
+        "W1192",
+        "W1276",
+        "W1462",
+        "W1555"
+      ]
+    },
+    {
+      "glyphs": [
+        "degree"
+      ],
+      "unicode": "ీ",
+      "direction": "previous",
+      "operation": "post_attach_to_prev_base",
+      "stream_position": "after_base",
+      "support": 3,
+      "opposing": 0,
+      "confidence": 1.0,
+      "ids": [
+        "W0462",
+        "W0603",
+        "W0994"
+      ]
+    },
+    {
+      "glyphs": [
+        "pi"
+      ],
+      "unicode": "ే",
+      "context": {},
+      "direction": "next",
+      "operation": "attach_next",
+      "support": 6,
+      "confidence": 1.0,
+      "opposing": 0,
+      "opposing_ids": [],
+      "occurrence_words": 6,
+      "abstained_words": 0,
+      "ids": [
+        "W0618",
+        "W0306",
+        "W0944",
+        "W1069",
+        "W1150",
+        "W1038"
+      ],
+      "eligible": true
+    }
+  ],
+  "font_family": "Priyaanka",
+  "format_version": 2,
+  "metadata": {
+    "chosen_lambda": 2.0,
+    "min_support": 3,
+    "attachment_confidence": 0.8,
+    "selection_order": "rules_first",
+    "split": {
+      "train": 934,
+      "validation": 215,
+      "test": 287
+    },
+    "label_count": 90,
+    "validation_score": [
+      196,
+      -35
+    ],
+    "skipped_ids": 68,
+    "conflicting_sequences": 0,
+    "training_only_parameter_estimation": true,
+    "test_used_for_selection": false,
+    "historical_baseline_training_words": 1149,
+    "f5_training_words": 934,
+    "label_exposure": "F3 labels include historical test contexts; user supplied historical test error examples. Those target examples were not inserted into candidates or rules. This is conditional evaluation, not a new blind test.",
+    "source_hashes": {
+      "F5/align.py": "efa4dbe7681e53bb280a670ed1e26e438b0191b6046d0e2f11176ec58a9fdf1b",
+      "F5/decode.py": "121951c7d9fb5fc76d344bca471fe9c6b5835fa534f66e83a15b645cda2109ec",
+      "F5/pages.py": "237fc838eaf36eeb40b5563dc44286c07680338a797a4fc82d4e4e3233cad104",
+      "F5/report.py": "09331bcb6b935d7c04bf0b8b8339fca3e6c71d6b25f60d63c3faff631061189b",
+      "F2/align.py": "caaee368e2cfe3f96efcd32b2498c8908dc53d6ce494e3b71805ec869ec58832",
+      "F2/split_ledger.json": "611fe7afe25410adc32637a1d2873720ec276ea887aebf50bd8298fc8da38a45",
+      "F4/split.json": "611fe7afe25410adc32637a1d2873720ec276ea887aebf50bd8298fc8da38a45",
+      "F1_batches/words.json": "df287e9f4a73668c2efd12fe8b9183834ebc58a213d23bd653eecae0f79197c5",
+      "F3/index.json": "b4517126bb55d9c44329bfdca3c16a42a7ac7271099602ad0e5f6c289b9d8a60",
+      "F3/cells.json": "f406cf76489ccb939b2c6442dbcedd8849b5adb74928630a3affb7a9bf714bb8",
+      "names_scert_5telugu_2020_Priyaanka.json": "fa69951854bc23e7b7ed0a3f14db048ed55b8c50dde70d55ddaf5c971b0b4fb7",
+      "F5/split_decision.json": "e08a24d2a87fb643803e628865cf803f5109548d10c1d68b5ba2e5dd2c36f75c",
+      "F4/evaluation_model.json": "b5d357bd1684b7808e29bdc6b9bddcd62481e713c4ec84d96f2d9c277c024b76",
+      "F4/F2_baseline_model.json": "f2b4facd8800a9575609a875bdf081527fb3578f300282ad59ff91c34346d706",
+      "F4/pages.py": "a14d8492a0f4e77d6528db8fce2892d9d69d11d2251f73399f6614d271bf3f61",
+      "F4/decoded_pages/manifest.json": "f7fd74e7ac7f41092c026a023193a0d06b0caf0e974f9d7d8ec7cb422827d6e4"
+    },
+    "labels_sha256": "4c05c5b347f1e73dc0d0997a9e7d6f7fc7dd0ee23346c3e40a56d194b98c7ffa",
+    "transcripts_sha256": "bac5b3eb1328fe718836688bae3794946f20dbeda55e211a04e15ce9deb56096",
+    "task": "F7",
+    "selection": "VALIDATION exact increase and zero previously-correct regressions",
+    "min_direction_support": 3,
+    "min_direction_confidence": 0.8,
+    "default_direction": "none"
+  },
+  "normalizations": [
+    {
+      "id": "double_left_quote",
+      "kind": "replace",
+      "source": "‘‘",
+      "target": "“"
+    },
+    {
+      "id": "double_right_quote",
+      "kind": "replace",
+      "source": "’’",
+      "target": "”"
+    },
+    {
+      "id": "collapse_0c3e_0c40_to_0c40",
+      "kind": "replace",
+      "source": "ాీ",
+      "target": "ీ",
+      "train_support": 2,
+      "train_ids": [
+        "W0199",
+        "W1046"
+      ]
+    },
+    {
+      "id": "collapse_0c46_0c42_to_0c42",
+      "kind": "replace",
+      "source": "ెూ",
+      "target": "ూ",
+      "train_support": 1,
+      "train_ids": [
+        "W1487"
+      ]
+    },
+    {
+      "id": "collapse_0c46_0c48_to_0c48",
+      "kind": "replace",
+      "source": "ెై",
+      "target": "ై",
+      "train_support": 10,
+      "train_ids": [
+        "W0061",
+        "W0213",
+        "W0229",
+        "W0412",
+        "W0669",
+        "W0676",
+        "W0775",
+        "W0784",
+        "W0943",
+        "W1397"
+      ]
+    },
+    {
+      "id": "nfc",
+      "kind": "nfc"
+    }
+  ],
+  "_unit_index": {
+    "e": [
+      {
+        "glyphs": [
+          "e",
+          "T"
+        ],
+        "unicode": "మ",
+        "support": 25,
+        "ids": [
+          "W0020",
+          "W0035",
+          "W0060",
+          "W0109",
+          "W0154",
+          "W0183",
+          "W0188",
+          "W0299",
+          "W0389",
+          "W0435",
+          "W0439",
+          "W0460",
+          "W0519",
+          "W0739",
+          "W0848",
+          "W0935",
+          "W0994",
+          "W1059",
+          "W1136",
+          "W1223",
+          "W1229",
+          "W1305",
+          "W1344",
+          "W1443",
+          "W1523"
+        ],
+        "discovery_support": 50,
+        "label_deviations": 2,
+        "alignment_cost_gain": 7.67776,
+        "emission_cost": 4.5
+      },
+      {
+        "glyphs": [
+          "e",
+          "divide"
+        ],
+        "unicode": "మా",
+        "support": 11,
+        "ids": [
+          "W0034",
+          "W0227",
+          "W0344",
+          "W0520",
+          "W0659",
+          "W0665",
+          "W0697",
+          "W0718",
+          "W0847",
+          "W1307",
+          "W1466"
+        ],
+        "discovery_support": 11,
+        "label_deviations": 1,
+        "alignment_cost_gain": 5.719975,
+        "emission_cost": 2.5
+      }
+    ],
+    "dollar": [
+      {
+        "glyphs": [
+          "dollar",
+          "T"
+        ],
+        "unicode": "మి",
+        "support": 13,
+        "ids": [
+          "W0090",
+          "W0107",
+          "W0227",
+          "W0460",
+          "W0501",
+          "W0743",
+          "W0822",
+          "W0839",
+          "W1095",
+          "W1278",
+          "W1443",
+          "W1458",
+          "W1541"
+        ],
+        "discovery_support": 13,
+        "label_deviations": 2,
+        "alignment_cost_gain": 7.413639,
+        "emission_cost": 4.5
+      }
+    ],
+    "Aacute": [
+      {
+        "glyphs": [
+          "Aacute",
+          "bar",
+          "udieresis"
+        ],
+        "unicode": "ప్ర",
+        "support": 10,
+        "ids": [
+          "W0047",
+          "W0189",
+          "W0277",
+          "W0660",
+          "W0849",
+          "W0926",
+          "W1161",
+          "W1179",
+          "W1371",
+          "W1484"
+        ],
+        "discovery_support": 10,
+        "label_deviations": 0,
+        "alignment_cost_gain": 0.876744,
+        "emission_cost": 0.5
+      },
+      {
+        "glyphs": [
+          "Aacute",
+          "quoteleft",
+          "periodcentered"
+        ],
+        "unicode": "త్ర",
+        "support": 3,
+        "ids": [
+          "W0422",
+          "W0588",
+          "W0743"
+        ],
+        "discovery_support": 3,
+        "label_deviations": 0,
+        "alignment_cost_gain": 0.838047,
+        "emission_cost": 0.5
+      },
+      {
+        "glyphs": [
+          "Aacute",
+          "X"
+        ],
+        "unicode": "శ్ర",
+        "support": 3,
+        "ids": [
+          "W0096",
+          "W0213",
+          "W0214"
+        ],
+        "discovery_support": 3,
+        "label_deviations": 0,
+        "alignment_cost_gain": 0.806948,
+        "emission_cost": 0.5
+      }
+    ],
+    "s": [
+      {
+        "glyphs": [
+          "s",
+          "T",
+          "T"
+        ],
+        "unicode": "యి",
+        "support": 10,
+        "ids": [
+          "W0156",
+          "W0338",
+          "W0387",
+          "W0729",
+          "W1203",
+          "W1274",
+          "W1336",
+          "W1347",
+          "W1369",
+          "W1545"
+        ],
+        "discovery_support": 9,
+        "label_deviations": 3,
+        "alignment_cost_gain": 17.425472,
+        "emission_cost": 6.5
+      },
+      {
+        "glyphs": [
+          "s",
+          "Y"
+        ],
+        "unicode": "ర్",
+        "support": 6,
+        "ids": [
+          "W0087",
+          "W0381",
+          "W1046",
+          "W1067",
+          "W1126",
+          "W1272"
+        ],
+        "discovery_support": 6,
+        "label_deviations": 0,
+        "alignment_cost_gain": 4.825526,
+        "emission_cost": 0.5
+      }
+    ],
+    "less": [
+      {
+        "glyphs": [
+          "less",
+          "Ucircumflex",
+          "adieresis"
+        ],
+        "unicode": "ధ",
+        "support": 9,
+        "ids": [
+          "W0034",
+          "W0063",
+          "W0087",
+          "W0390",
+          "W0596",
+          "W0749",
+          "W1326",
+          "W1451",
+          "W1537"
+        ],
+        "discovery_support": 9,
+        "label_deviations": 2,
+        "alignment_cost_gain": 7.754044,
+        "emission_cost": 4.5
+      },
+      {
+        "glyphs": [
+          "less",
+          "product",
+          "adieresis"
+        ],
+        "unicode": "థ",
+        "support": 3,
+        "ids": [
+          "W0760",
+          "W1079",
+          "W1278"
+        ],
+        "discovery_support": 3,
+        "label_deviations": 1,
+        "alignment_cost_gain": 6.846173,
+        "emission_cost": 2.5
+      },
+      {
+        "glyphs": [
+          "less",
+          "Ucircumflex"
+        ],
+        "unicode": "ధ",
+        "support": 3,
+        "ids": [
+          "W0931",
+          "W1267",
+          "W1276"
+        ],
+        "discovery_support": 12,
+        "label_deviations": 2,
+        "alignment_cost_gain": 7.751902,
+        "emission_cost": 4.5
+      }
+    ],
+    "periodcentered": [
+      {
+        "glyphs": [
+          "periodcentered",
+          "T",
+          "plus"
+        ],
+        "unicode": "ం",
+        "support": 9,
+        "ids": [
+          "W0201",
+          "W0435",
+          "W0473",
+          "W0480",
+          "W0866",
+          "W1188",
+          "W1277",
+          "W1491",
+          "W1523"
+        ],
+        "discovery_support": 9,
+        "label_deviations": 1,
+        "alignment_cost_gain": 4.490685,
+        "emission_cost": 2.5
+      },
+      {
+        "glyphs": [
+          "periodcentered",
+          "T",
+          "acute"
+        ],
+        "unicode": "్య",
+        "support": 8,
+        "ids": [
+          "W0069",
+          "W0119",
+          "W0252",
+          "W0488",
+          "W0776",
+          "W0778",
+          "W0874",
+          "W1372"
+        ],
+        "discovery_support": 8,
+        "label_deviations": 1,
+        "alignment_cost_gain": 4.491428,
+        "emission_cost": 2.5
+      }
+    ],
+    "u": [
+      {
+        "glyphs": [
+          "u",
+          "Ucircumflex",
+          "Ntilde"
+        ],
+        "unicode": "భ",
+        "support": 8,
+        "ids": [
+          "W0151",
+          "W0339",
+          "W0414",
+          "W0832",
+          "W0851",
+          "W1123",
+          "W1239",
+          "W1484"
+        ],
+        "discovery_support": 8,
+        "label_deviations": 1,
+        "alignment_cost_gain": 5.224921,
+        "emission_cost": 2.5
+      },
+      {
+        "glyphs": [
+          "u",
+          "Ucircumflex",
+          "lessequal"
+        ],
+        "unicode": "భా",
+        "support": 4,
+        "ids": [
+          "W0005",
+          "W0208",
+          "W0407",
+          "W1276"
+        ],
+        "discovery_support": 4,
+        "label_deviations": 1,
+        "alignment_cost_gain": 5.586212,
+        "emission_cost": 2.5
+      }
+    ],
+    "j": [
+      {
+        "glyphs": [
+          "j",
+          "periodcentered",
+          "T"
+        ],
+        "unicode": "య",
+        "support": 6,
+        "ids": [
+          "W0142",
+          "W0210",
+          "W0748",
+          "W0871",
+          "W1061",
+          "W1541"
+        ],
+        "discovery_support": 34,
+        "label_deviations": 1,
+        "alignment_cost_gain": 4.490007,
+        "emission_cost": 2.5
+      },
+      {
+        "glyphs": [
+          "j",
+          "periodcentered",
+          "divide"
+        ],
+        "unicode": "యా",
+        "support": 6,
+        "ids": [
+          "W0369",
+          "W0771",
+          "W0778",
+          "W1041",
+          "W1053",
+          "W1101"
+        ],
+        "discovery_support": 6,
+        "label_deviations": 0,
+        "alignment_cost_gain": 2.532223,
+        "emission_cost": 0.5
+      }
+    ],
+    "integral": [
+      {
+        "glyphs": [
+          "integral",
+          "Atilde"
+        ],
+        "unicode": "చ్చి",
+        "support": 6,
+        "ids": [
+          "W0001",
+          "W0079",
+          "W1183",
+          "W1264",
+          "W1374",
+          "W1467"
+        ],
+        "discovery_support": 6,
+        "label_deviations": 1,
+        "alignment_cost_gain": 4.565882,
+        "emission_cost": 2.5
+      }
+    ],
+    "ugrave": [
+      {
+        "glyphs": [
+          "ugrave",
+          "bar"
+        ],
+        "unicode": "పే",
+        "support": 6,
+        "ids": [
+          "W0265",
+          "W0333",
+          "W0452",
+          "W0975",
+          "W1220",
+          "W1515"
+        ],
+        "discovery_support": 6,
+        "label_deviations": 0,
+        "alignment_cost_gain": 0.551447,
+        "emission_cost": 0.5
+      }
+    ],
+    "y": [
+      {
+        "glyphs": [
+          "y",
+          "Oacute",
+          "T"
+        ],
+        "unicode": "మె",
+        "support": 4,
+        "ids": [
+          "W0496",
+          "W0683",
+          "W0909",
+          "W1582"
+        ],
+        "discovery_support": 4,
+        "label_deviations": 2,
+        "alignment_cost_gain": 6.414904,
+        "emission_cost": 4.503199
+      },
+      {
+        "glyphs": [
+          "y",
+          "ring",
+          "T"
+        ],
+        "unicode": "మే",
+        "support": 3,
+        "ids": [
+          "W0120",
+          "W1458",
+          "W1507"
+        ],
+        "discovery_support": 3,
+        "label_deviations": 2,
+        "alignment_cost_gain": 6.294438,
+        "emission_cost": 4.5
+      }
+    ],
+    "M": [
+      {
+        "glyphs": [
+          "M",
+          "T"
+        ],
+        "unicode": "మీ",
+        "support": 4,
+        "ids": [
+          "W0236",
+          "W0404",
+          "W0987",
+          "W1066"
+        ],
+        "discovery_support": 4,
+        "label_deviations": 1,
+        "alignment_cost_gain": 6.74246,
+        "emission_cost": 2.5
+      }
+    ],
+    "pi": [
+      {
+        "glyphs": [
+          "pi",
+          "oslash"
+        ],
+        "unicode": "కే",
+        "support": 4,
+        "ids": [
+          "W0662",
+          "W1076",
+          "W1383",
+          "W1581"
+        ],
+        "discovery_support": 4,
+        "label_deviations": 0,
+        "alignment_cost_gain": 0.66868,
+        "emission_cost": 0.5
+      }
+    ],
+    "bracketleft": [
+      {
+        "glyphs": [
+          "bracketleft",
+          "fl"
+        ],
+        "unicode": "ళ్ళి",
+        "support": 3,
+        "ids": [
+          "W0240",
+          "W0497",
+          "W1039"
+        ],
+        "discovery_support": 3,
+        "label_deviations": 0,
+        "alignment_cost_gain": 2.628239,
+        "emission_cost": 0.5
+      }
+    ],
+    "ocircumflex": [
+      {
+        "glyphs": [
+          "ocircumflex",
+          "bar"
+        ],
+        "unicode": "పె",
+        "support": 3,
+        "ids": [
+          "W0232",
+          "W0786",
+          "W0862"
+        ],
+        "discovery_support": 3,
+        "label_deviations": 0,
+        "alignment_cost_gain": 2.261621,
+        "emission_cost": 0.5
+      }
+    ]
+  },
+  "repair_rules": [
+    {
+      "id": "R1",
+      "variant": "whole"
+    }
+  ]
+}

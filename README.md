@@ -159,6 +159,14 @@ preserves ordinary processing. Diagnostic alignment exhaustion retains text with
 ambiguity is also reported.
 See [glyph recovery and its limits](docs/glyph-recovery.md).
 
+## Research: Telugu legacy fonts (Priyaanka)
+
+The [Priyaanka research folder](research/telugu-legacy-priyaanka/) contains an
+experimental standalone decoder from legacy glyph names to Unicode Telugu.
+Its labelled evaluation comes from one textbook, and results vary across other
+PDFs using the same font family. It is not part of the CLI or translation
+pipeline and is not safe to rely on for anything important.
+
 ## Web UI
 
 LegacyLipi includes a modern React-based web interface backed by a FastAPI REST API.

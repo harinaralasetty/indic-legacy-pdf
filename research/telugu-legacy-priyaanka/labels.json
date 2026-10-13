@@ -1,0 +1,362 @@
+{
+ "T": {
+  "unicode": "ు",
+  "note": "u-sign"
+ },
+ "plus": {
+  "unicode": "ం",
+  "note": "anusvara"
+ },
+ "s": {
+  "unicode": "ర",
+  "note": "consonant ra"
+ },
+ "udieresis": {
+  "unicode": "",
+  "note": "head piece on top of ప/స bodies"
+ },
+ "periodcentered": {
+  "unicode": "",
+  "note": "head piece on top of త/చ/య bodies"
+ },
+ "oslash": {
+  "unicode": "క",
+  "note": "consonant ka"
+ },
+ "e": {
+  "unicode": "వ",
+  "note": "body of వ; also body of మ (మ = e + head?) check context"
+ },
+ "backslash": {
+  "unicode": "ల",
+  "note": "consonant la"
+ },
+ "q": {
+  "unicode": "న",
+  "note": "consonant na"
+ },
+ "bar": {
+  "unicode": "ప",
+  "note": "consonant pa body (head glyph on top)"
+ },
+ "quoteleft": {
+  "unicode": "త",
+  "note": "consonant ta"
+ },
+ "less": {
+  "unicode": "ద",
+  "note": "consonant da"
+ },
+ "period": {
+  "unicode": ".",
+  "note": "full stop (three in a row = ellipsis)"
+ },
+ "sterling": {
+  "unicode": "",
+  "note": "head piece on top of క body"
+ },
+ "ampersand": {
+  "unicode": "డ",
+  "note": "consonant dda body"
+ },
+ "ecircumflex": {
+  "unicode": "ా",
+  "note": "aa-sign (long bar)"
+ },
+ "exclamdown": {
+  "unicode": "",
+  "note": "head piece on top of ర body"
+ },
+ "greater": {
+  "unicode": "గ",
+  "note": "consonant ga"
+ },
+ "d": {
+  "unicode": "స",
+  "note": "consonant sa"
+ },
+ "adieresis": {
+  "unicode": "",
+  "note": "head piece on top of ద body"
+ },
+ "numbersign": {
+  "unicode": "చ",
+  "note": "consonant ca"
+ },
+ "Eacute": {
+  "unicode": "",
+  "note": "head piece on top of డ body"
+ },
+ "igrave": {
+  "unicode": "ని",
+  "note": "precomposed na+i"
+ },
+ "lessequal": {
+  "unicode": "ా",
+  "note": "aa-sign bar variant (highlight missing on sheet; inferred from words)"
+ },
+ "hungarumlaut": {
+  "unicode": "ల",
+  "note": "consonant la"
+ },
+ "divide": {
+  "unicode": "ా",
+  "note": "bar; ALSO appears in ూ (bar + hook) - context"
+ },
+ "n": {
+  "unicode": "అ",
+  "note": "independent vowel a"
+ },
+ "j": {
+  "unicode": "య",
+  "note": "consonant ya"
+ },
+ "Oacute": {
+  "unicode": "ె",
+  "note": "e-sign (also first part of ై)"
+ },
+ "Idieresis": {
+  "unicode": "ి",
+  "note": "i-sign small, over ట"
+ },
+ "summation": {
+  "unicode": "",
+  "note": "head piece on top of గ body"
+ },
+ "approxequal": {
+  "unicode": "క",
+  "note": "consonant ka"
+ },
+ "ring": {
+  "unicode": "ే",
+  "note": "e-long sign (top hook)"
+ },
+ "y": {
+  "unicode": "వ",
+  "note": "consonant va"
+ },
+ "H": {
+  "unicode": "న",
+  "note": "consonant na (variant body)"
+ },
+ "comma": {
+  "unicode": ",",
+  "note": "comma"
+ },
+ "idieresis": {
+  "unicode": "్న",
+  "note": "subscript na (virama+na)"
+ },
+ "plusminus": {
+  "unicode": "ా",
+  "note": "aa-sign hook"
+ },
+ "Otilde": {
+  "unicode": "ా",
+  "note": "aa-sign bar"
+ },
+ "b": {
+  "unicode": "ప",
+  "note": "pa body (ఫ may be b + extra piece, check)"
+ },
+ "acute": {
+  "unicode": "్య",
+  "note": "subscript ya"
+ },
+ "icircumflex": {
+  "unicode": "ు",
+  "note": "u-sign"
+ },
+ "greaterequal": {
+  "unicode": "ట",
+  "note": "consonant tta (variant 1)"
+ },
+ "asciitilde": {
+  "unicode": "ది",
+  "note": "da+i precomposed"
+ },
+ "Aacute": {
+  "unicode": "్ర",
+  "note": "subscript ra (hook on left)"
+ },
+ "Agrave": {
+  "unicode": "ో",
+  "note": "o-long sign top piece (check)"
+ },
+ "Ucircumflex": {
+  "unicode": "",
+  "note": "small dot tail under భ/ధ bodies (aspirate tail piece)"
+ },
+ "ae": {
+  "unicode": "ి",
+  "note": "i-sign loop"
+ },
+ "braceleft": {
+  "unicode": "ట",
+  "note": "consonant tta (variant 2)"
+ },
+ "bracketright": {
+  "unicode": "రి",
+  "note": "ra+i precomposed"
+ },
+ "radical": {
+  "unicode": "ో",
+  "note": "o-long sign with base (కో, రో)"
+ },
+ "u": {
+  "unicode": "బ",
+  "note": "ba body; భ = u + Ucircumflex tail"
+ },
+ "cent": {
+  "unicode": "్ల",
+  "note": "subscript la"
+ },
+ "dollar": {
+  "unicode": "వి",
+  "note": "va+i precomposed"
+ },
+ "Ocircumflex": {
+  "unicode": "్త",
+  "note": "subscript ta"
+ },
+ "edieresis": {
+  "unicode": "ా",
+  "note": "aa-sign top bar over ద"
+ },
+ "integral": {
+  "unicode": "చి",
+  "note": "ca+i precomposed"
+ },
+ "ccedilla": {
+  "unicode": "ి",
+  "note": "i-sign small loop above డ"
+ },
+ "ordmasculine": {
+  "unicode": "్ట",
+  "note": "subscript tta"
+ },
+ "fraction": {
+  "unicode": "ు",
+  "note": "u-sign hook variant"
+ },
+ "ntilde": {
+  "unicode": "ఉ",
+  "note": "independent vowel u"
+ },
+ "Adieresis": {
+  "unicode": "ఆ",
+  "note": "independent vowel aa"
+ },
+ "X": {
+  "unicode": "శ",
+  "note": "consonant sha"
+ },
+ "asterisk": {
+  "unicode": "లి",
+  "note": "la+i precomposed"
+ },
+ "agrave": {
+  "unicode": "్మ",
+  "note": "subscript ma"
+ },
+ "equal": {
+  "unicode": "ొ",
+  "note": "o-short sign top hook (with consonant base)"
+ },
+ "parenright": {
+  "unicode": ")",
+  "note": "close paren"
+ },
+ "Ccedilla": {
+  "unicode": "ఇ",
+  "note": "independent vowel i"
+ },
+ "parenleft": {
+  "unicode": "(",
+  "note": "open paren"
+ },
+ "macron": {
+  "unicode": "",
+  "note": "head piece on top of శ body"
+ },
+ "ydieresis": {
+  "unicode": "్క",
+  "note": "subscript ka"
+ },
+ "k": {
+  "unicode": "స",
+  "note": "consonant sa variant body"
+ },
+ "mu": {
+  "unicode": "’",
+  "note": "right single quote (double quote = two of these)"
+ },
+ "ordfeminine": {
+  "unicode": "‘",
+  "note": "left single quote (double = two)"
+ },
+ "atilde": {
+  "unicode": "బ",
+  "note": "consonant ba body"
+ },
+ "V": {
+  "unicode": "హ",
+  "note": "consonant ha"
+ },
+ "guillemotright": {
+  "unicode": "జ",
+  "note": "consonant ja"
+ },
+ "guillemotleft": {
+  "unicode": "్వ",
+  "note": "subscript va"
+ },
+ "R": {
+  "unicode": "=",
+  "note": "equals sign"
+ },
+ "ocircumflex": {
+  "unicode": "ె",
+  "note": "e-short sign top piece (పె); with quoteright forms ై"
+ },
+ "Ograve": {
+  "unicode": "ే",
+  "note": "e-long sign top variant"
+ },
+ "m": {
+  "unicode": "ఎ",
+  "note": "independent vowel e"
+ },
+ "quoteright": {
+  "unicode": "ై",
+  "note": "lower hook of ై: ocircumflex+quoteright = ై (ెై -> ై rule)"
+ },
+ "Atilde": {
+  "unicode": "్చ",
+  "note": "subscript ca"
+ },
+ "guilsinglleft": {
+  "unicode": "తి",
+  "note": "ta+i precomposed"
+ },
+ "D": {
+  "unicode": "ణ",
+  "note": "consonant nna"
+ },
+ "endash": {
+  "unicode": "గి",
+  "note": "ga+i precomposed"
+ },
+ "OE": {
+  "unicode": "్ప",
+  "note": "subscript pa"
+ },
+ "ogonek": {
+  "unicode": "ో",
+  "note": "o-long sign top (with base ప)"
+ },
+ "ugrave": {
+  "unicode": "ే",
+  "note": "e-long sign top variant (over చ/స/ప)"
+ }
+}
