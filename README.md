@@ -1,3 +1,7 @@
+> **legacylipi-telugu** is a derivative of [biswasbiplob/legacylipi](https://github.com/biswasbiplob/legacylipi) (MIT, see [NOTICE.md](NOTICE.md)).
+> It adds Telugu *glyph-ID* PDF text recovery (`legacylipi recover-text`; automatic detection as `glyph-id`) - see [docs/glyph-recovery.md](docs/glyph-recovery.md).
+> Status: independently reviewed over several rounds. Recovery that relies on inferred character mappings is reported with warnings and is **not** proof of original spelling. Legacy ASCII-mapped Telugu fonts (Priyaanka, Pallava, ...) are **not** supported yet.
+
 # LegacyLipi
 
 **Legacy Font PDF Translator** - Translate PDF documents with legacy Indian font encodings to English.
