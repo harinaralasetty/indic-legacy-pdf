@@ -10,7 +10,7 @@ mapping cannot undo Indic shaping.
 Install the `glyph` extra (`uharfbuzz` and `fonttools`). It is also included in
 `dev`. Detection requires fontTools to verify Telugu support in the embedded
 font program; without it, detection returns no glyph-ID candidates and preserves
-the existing detection path. HarfBuzz is required only for recovery. Recovery
+the existing detection path. HarfBuzz is required for recovery and shaped Telugu PDF output. Recovery
 gives an installation message when either dependency is missing.
 
 ```bash
@@ -32,8 +32,11 @@ A completed recovery can still contain unknown glyphs: review the metrics.
 
 CLI `translate`, `convert`, `extract`, and the API translation pipeline share
 `UnicodeConverter.convert_with_recovery`. When detection returns `glyph-id`, it
-recovers only pages whose per-page encoding equals `glyph-id`. Other pages retain
-the existing conversion handling. Translation defaults to source language `te`;
+recovers candidate font runs on pages whose per-page encoding equals `glyph-id`.
+Legacy runs on those same pages are converted by their own font/text detection,
+then combined with recovered Telugu in reading order. Other pages retain the
+existing conversion handling. Explicit `USER_OVERRIDE` results in `page_encodings`
+(and CLI `--encoding`) take precedence over automatic font matches. Translation defaults to source language `te`;
 CLI `--source-lang` and API `source_lang` override that default.
 
 The commands above use `mock`, which echoes text with a prefix without a network
@@ -42,8 +45,14 @@ Text, Markdown (including bilingual source text), and positioned PDF output all
 receive recovered Unicode. PDF output prefers an installed Telugu font (Noto
 Sans Telugu, Kohinoor Telugu, Nirmala UI, Lohit Telugu, or Gautami); text/Markdown
 viewers choose their own fonts. Install a Telugu font if none is available.
-Telugu PDF text uses the HarfBuzz-backed `insert_htmlbox` path, tested against
-independently shaped glyph IDs. Devanagari retains its existing rendering path.
+Telugu PDF text paints HarfBuzz-shaped GIDs using occurrence-specific CIDs,
+`CIDToGIDMap`, and a logical `ToUnicode` CMap for each output font run. Ligatures
+map to their complete logical text; empty logical glyphs have a glyph-local empty
+`ActualText` span. This avoids whole-line `ActualText` duplication. Missing Latin
+letters use the bundled Noto Sans Devanagari font. Tests check exact PyMuPDF and
+pypdf extraction, painted GIDs, and installed-font glyph positions. PyMuPDF trace
+entries with GID -1 represent extra logical characters, not painted glyphs.
+Devanagari-only text retains its existing rendering path.
 
 `recover_document` reuses `recover_pdf`'s run decoding and visual-line grouping.
 It creates one `TextBlock` per approximate baseline row, with the union of its
@@ -91,14 +100,19 @@ request recovery explicitly.
    This uses the same shaping and cmap assumptions that built the reverse map;
    it checks internal consistency, not the correctness of inferred cmap entries.
 
-Detection precedence uses fonts actually present in text blocks, never unused
-font resources. Used legacy fonts retain precedence on their page; Unicode
-blocks stay Unicode even on a legacy page. Glyph-ID results replace only affected
-pages; all other pages retain normal detection and legacy conversion results.
+Glyph-ID discovery inspects only used font resources. A legacy run does not
+exclude glyph recovery on the same page. Documents without glyph candidates
+retain the original detector/converter behavior, including document-font order,
+unused legacy resource precedence, and page-wide encoding decisions. Those
+historical rules can convert ordinary text under a legacy encoding; they are
+preserved for compatibility and covered by frozen main-pipeline golden outputs.
+No additional non-glyph behavior correction is introduced here.
 
 Font verification verdicts are cached by xref within a document scan and by
 original font SHA-256 across scans (up to 128 hash/boolean entries in memory).
-Unused resources do not trigger glyph-ID detection. Unsupported content streams
+Unused resources are not decoded and consume no glyph-font budget. Undecodable
+or unsupported used font programs are excluded from automatic detection; explicit
+recovery returns a controlled error naming the font. Unsupported content streams
 or ambiguous resource associations are conservatively excluded from detection.
 
 Maps are cached only in memory, keyed by the original font SHA-256 and script,
@@ -143,7 +157,13 @@ text with a perfect round trip. This is why uncertainty is propagated.
   original and reshaped run lengths, aggregated by glyph counts. Both insertions
   and deletions reduce it. Page/run records include mismatching ranges and GIDs.
   Inserted layout tabs, spaces and page breaks do not enter this calculation.
-  Matching `.notdef` boxes are excluded from successful matches.
+  Matching `.notdef` boxes are excluded from successful matches. The value is
+  `null` when diagnostic verification is incomplete, rather than a misleading
+  partial ratio.
+- `verification_complete`: present on run, page, and document records. `false`
+  means at least one unequal run was not aligned within the diagnostic allowance.
+  Recovery still returns text, coverage, and a `verification-incomplete` warning.
+  `alignment_work` records the consumed document alignment allowance.
 - `verification_note`: explains that round-trip = internal consistency of
   reading order/whitespace/ambiguity; it does NOT verify that inferred cmap
   mappings are correct. Manual comparison was done once on one page region by a
@@ -223,10 +243,13 @@ these warnings, including in quiet mode. `--strict-cmap` / `strict_cmap=True`
 (default false) refuses recovery if any output mapping needs inference.
 Semantic glyph-name repairs do not count as inferred cmap gaps.
 
-TJ numbers are thousandths of an em. Negative adjustments at or below -250
-open at least 0.25 × font size of extra space and split runs; positive values
-close gaps, and smaller negative kerning stays inside syllables. Layout gaps
-between runs use the existing 0.15 × font-size rule (minimum 1 point).
+Word boundaries use one geometric rule, regardless of `TJ`, `Tj`, `Td`, or `Tm`
+syntax: subtract the previous glyph's PDF advance (`W`/`DW`) from the distance
+between glyph origins. A remaining gap greater than 0.15 em adds a space; above
+2 em it adds a tab. A 0.001-point tolerance avoids floating-point threshold noise.
+Only recovered cluster boundaries are eligible: kerning inside a matched
+syllable/conjunct does not split it. Physical positioning is checked independently
+of logical text and does not become evidence in the round-trip score.
 
 A space GID after virama with zero advance may be a ZWJ/ZWNJ alias. Recovery
 keeps a joiner-less form and adds `ambiguous-joiner`; a positive observed advance
@@ -234,7 +257,7 @@ preserves the word space. Direct GID-only decoding lacks positions and takes
 the conservative joiner-less choice. Neither choice proves original spelling.
 There is no `--include-invisible` option.
 
-Default recovery budgets (controlled `RecoveryBudgetError`, a `ValueError`):
+Default hard recovery budgets (controlled `ValueError`, usually `RecoveryBudgetError`):
 
 | Resource | Limit |
 |---|---:|
@@ -243,15 +266,29 @@ Default recovery budgets (controlled `RecoveryBudgetError`, a `ValueError`):
 | Form nesting | 32 |
 | Decoded bytes per stream | 16 MiB |
 | Total unique decoded stream bytes per traversal | 64 MiB |
-| Candidate font resources per document, including unused candidates | 8 |
+| Distinct used candidate font programs per document, by SHA-256 | 8 |
 | Accounted map allocation per build | 768 MiB |
 | Retained global maps | 1 |
+
+Diagnostic budgets are separate from the hard recovery limits:
+
+| Diagnostic work | Limit |
+|---|---:|
+| Unequal alignment length product per run | 250,000 |
 | Aggregate unequal alignment length products | 4,000,000 |
 
+Exhausting either diagnostic limit retains recovered text and reports
+`verification_complete: false`, a `null` round-trip ratio, and a warning. Hard
+content/font/map limits still stop recovery. `--strict-cmap` controls inferred
+mappings only; it does not turn diagnostic exhaustion into a recovery failure.
+
 Discovery memoizes Form/resource contexts; recovery counts actual expansions
-and refuses exponential paint graphs before MuPDF tracing. Unfiltered and single
-Flate streams are decoded with bounds; other filters are conservatively unsupported.
-Maps are processed one font at a time and released before the next build. The
+and refuses exponential paint graphs before MuPDF tracing. Unfiltered, Flate,
+ASCIIHex, ASCII85, and LZW streams have bounded decoding; supported filter chains
+use MuPDF streaming decoders. Predictor transforms and DecodeParms arrays remain
+unsupported. Duplicate font bytes share storage and one map by SHA-256, so
+per-page copies do not consume additional font allowances. Maps are processed
+one distinct program at a time and released before the next build. The
 map counter estimates Python allocations conservatively; it is not an OS RSS cap,
 and callers retaining public map objects own their lifetime. Font/native parser
 allocations are not a process-isolation guarantee. Identical glyph sequences
@@ -260,3 +297,9 @@ use a linear fast path; unequal alignment is bounded before SequenceMatcher.
 Positioned translation fails with a nonzero CLI status when at least 50% of
 nonempty blocks fail. Below that threshold failed blocks retain source text,
 carry `translation_error`, and produce visible CLI/API warnings.
+
+`PipelineResult` is a two-field NamedTuple subclass: indexing, `len(result) == 2`,
+and two-value unpacking remain compatible, with warnings attached separately.
+The review tests use frozen golden outputs and generated fixtures, not a local
+`main` ref. Large generated-document checks are marked `slow` and skipped when
+`CI` is set; unit complexity checks use deterministic operation/expansion counts.

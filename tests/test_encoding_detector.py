@@ -511,8 +511,8 @@ class TestDocumentDetection:
         assert overall.confidence == 0.0
         assert len(page_results) == 0
 
-    def test_unused_document_font_metadata_is_not_evidence(self):
-        """Unused resource metadata cannot establish the text encoding."""
+    def test_document_with_font_metadata(self):
+        """Test that document-level font metadata is used."""
         detector = EncodingDetector()
 
         doc = PDFDocument(
@@ -528,8 +528,8 @@ class TestDocumentDetection:
 
         overall, page_results = detector.detect_from_document(doc)
 
-        # No block uses the legacy font resource.
-        assert not overall.is_legacy
+        # Should detect from document fonts
+        assert overall.detected_encoding == "shree-dev"
 
 
 class TestConvenienceFunction:

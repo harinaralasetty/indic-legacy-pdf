@@ -1044,7 +1044,12 @@ def recover_text(input_file: Path, output: Path, report_path: Path | None, stric
     for label, value in (
         ("Fonts found", str(len(report["fonts"]))),
         ("Glyph coverage", f"{report['glyph_coverage']:.2%}"),
-        ("Round-trip match", f"{report['roundtrip_match_ratio']:.2%}"),
+        (
+            "Round-trip match",
+            f"{report['roundtrip_match_ratio']:.2%}"
+            if report["verification_complete"]
+            else "incomplete",
+        ),
         ("Unknown glyphs", str(report["unknown_count"])),
         ("Collisions", str(report["collisions"])),
         ("Inferred cmap entries", str(report["inferred_cmap_entries"])),

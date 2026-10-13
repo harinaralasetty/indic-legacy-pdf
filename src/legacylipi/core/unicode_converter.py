@@ -330,12 +330,6 @@ class UnicodeConverter:
         converted_blocks = []
         for block in page.text_blocks:
             block_encoding = encoding or block.detected_encoding
-            if encoding_name is None:
-                from legacylipi.core.encoding_detector import EncodingDetector
-
-                font_result = EncodingDetector().detect_from_font_name(block.font_name or "")
-                if font_result:
-                    block_encoding = font_result.detected_encoding
             converted_block = self.convert_text_block(block, block_encoding)
             converted_blocks.append(converted_block)
 

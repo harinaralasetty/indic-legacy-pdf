@@ -10,10 +10,9 @@ import asyncio
 import logging
 import os
 import tempfile
-from collections.abc import Awaitable, Callable, Iterator
-from dataclasses import dataclass, field
+from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any
+from typing import NamedTuple
 
 from legacylipi.api.schemas import ConvertRequest, ScanCopyRequest, TranslateRequest
 
@@ -22,16 +21,22 @@ logger = logging.getLogger(__name__)
 ProgressCallback = Callable[[int, str, str], Awaitable[None]]
 
 
-@dataclass
-class PipelineResult:
+class _PipelineTuple(NamedTuple):
     content: bytes
     filename: str
-    warnings: list[dict] = field(default_factory=list)
-    inferred_codepoints: list[str] = field(default_factory=list)
 
-    def __iter__(self) -> Iterator[Any]:
-        # Preserve the existing two-value unpacking API.
-        return iter((self.content, self.filename))
+
+class PipelineResult(_PipelineTuple):
+    """The original two-item tuple API, with optional recovery diagnostics."""
+
+    warnings: list[dict]
+    inferred_codepoints: list[str]
+
+    def __new__(cls, content, filename, warnings=None, inferred_codepoints=None):
+        result = super().__new__(cls, content, filename)
+        result.warnings = [] if warnings is None else warnings
+        result.inferred_codepoints = [] if inferred_codepoints is None else inferred_codepoints
+        return result
 
 
 async def _report(cb: ProgressCallback | None, percent: int, step: str, message: str):

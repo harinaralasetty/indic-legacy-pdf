@@ -130,7 +130,9 @@ defaults to Telugu (`te`); `--source-lang` overrides it. `convert` and `extract`
 also recover automatically. Use `recover-text` for the detailed recovery report.
 
 `detect` flags `glyph-id` only when fontTools verifies Telugu support and page
-text uses those fonts; used legacy fonts take precedence on their own pages.
+text uses those fonts. Mixed pages recover Telugu and convert legacy runs in
+reading order. Explicit `--encoding` overrides take precedence; non-glyph
+behavior retains the original detector/converter rules.
 Recovery reports unknown glyphs, collisions, cmap repairs and per-page reshaping
 checks. Round-trip = internal consistency of reading order/whitespace/ambiguity;
 it does NOT verify that inferred cmap mappings are correct. Shaping builds the
@@ -141,8 +143,13 @@ from the repository; the repository evidence is synthetic ground-truth tests.
 The JSON `verification_note` and CLI footer explain this limit; inserted layout
 whitespace and order between runs are not checked.
 Invisible and clip-only text is excluded; fill+stroke is deduplicated. Telugu PDF
-output uses HarfBuzz through `insert_htmlbox`. Recovery has explicit CPU/font/memory
-budgets; joiner ambiguity is reported.
+output uses HarfBuzz with occurrence-specific CID/GID and Unicode maps, tested for
+exact PyMuPDF/pypdf extraction. Spacing uses a single geometric gap rule (>0.15 em)
+at cluster boundaries for all PDF positioning operators. Recovery counts distinct
+used font programs by hash; unused fonts consume no allowance. Hard content/font/
+memory limits stop recovery. Diagnostic alignment exhaustion retains text with
+`verification_complete: false`, a null round-trip score, and a warning; joiner
+ambiguity is also reported.
 See [glyph recovery and its limits](docs/glyph-recovery.md).
 
 ## Web UI

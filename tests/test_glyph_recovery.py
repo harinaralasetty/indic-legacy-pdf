@@ -90,7 +90,7 @@ def test_latin_identity_preserves_detection(tmp_path, latin_font_data):
 
 
 @pytest.mark.parametrize("embedded_script", ["latin", "telugu"])
-def test_legacy_signal_keeps_precedence(tmp_path, latin_font_data, embedded_script):
+def test_legacy_signal_preserved_except_glyph_runs(tmp_path, latin_font_data, embedded_script):
     pdf = make_pdf(
         tmp_path / "mixed.pdf",
         font_data=latin_font_data if embedded_script == "latin" else FONT.read_bytes(),
@@ -103,7 +103,12 @@ def test_legacy_signal_keeps_precedence(tmp_path, latin_font_data, embedded_scri
         doc.saveIncr()
     expected = baseline_detection(pdf, tmp_path)
     assert expected[0].detected_encoding == "kruti-dev"
-    assert EncodingDetector().detect_from_document(parse_pdf(pdf)) == expected
+    actual = EncodingDetector().detect_from_document(parse_pdf(pdf))
+    if embedded_script == "telugu":
+        assert actual[0].detected_encoding == "glyph-id"
+        assert actual[1][1].detected_encoding == "glyph-id"
+    else:
+        assert actual == expected
 
 
 def test_unused_telugu_resources_do_not_override(tmp_path):

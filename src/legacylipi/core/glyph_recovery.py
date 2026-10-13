@@ -96,6 +96,9 @@ MAX_STREAM_BYTES = 16 * 1024 * 1024
 MAX_TOTAL_BYTES = 64 * 1024 * 1024
 MAX_CANDIDATE_FONTS = 8
 MAX_ALIGNMENT_WORK = 4_000_000
+MAX_RUN_ALIGNMENT_WORK = 250_000
+WORD_GAP_EM = 0.15
+COLUMN_GAP_EM = 2.0
 MAX_MAP_BYTES = 768 * 1024 * 1024
 
 
@@ -110,8 +113,9 @@ class _Budget:
     decoded: int = 0
     alignment_work: int = 0
     streams: dict[int, bytes] = field(default_factory=dict)
+    font_programs: dict[str, bytes] = field(default_factory=dict)
 
-    def stream(self, doc: Any, xref: int) -> bytes:
+    def stream(self, doc: Any, xref: int, *, font_program: bool = False) -> bytes:
         if xref in self.streams:
             return self.streams[xref]
         length_kind, length = doc.xref_get_key(xref, "Length")
@@ -119,23 +123,75 @@ class _Budget:
             raise RecoveryBudgetError("Encoded stream byte budget exceeded")
         raw = doc.xref_stream_raw(xref)
         kind, filter_name = doc.xref_get_key(xref, "Filter")
+        # A duplicate font can still be decoded within the per-stream cap;
+        # its bytes are charged only after content-hash deduplication below.
+        decode_limit = (
+            MAX_STREAM_BYTES
+            if font_program
+            else min(MAX_STREAM_BYTES, MAX_TOTAL_BYTES - self.decoded)
+        )
         if kind == "null":
             data = raw
         elif filter_name in ("/FlateDecode", "[/FlateDecode]"):
             decoder = zlib.decompressobj()
             try:
-                data = decoder.decompress(
-                    raw, min(MAX_STREAM_BYTES, MAX_TOTAL_BYTES - self.decoded) + 1
-                )
+                data = decoder.decompress(raw, decode_limit + 1)
             except zlib.error as exc:
                 raise ValueError("Malformed compressed PDF stream") from exc
             if decoder.unconsumed_tail or not decoder.eof:
                 raise RecoveryBudgetError("Decoded stream byte budget exceeded or truncated stream")
         else:
-            raise ValueError(f"Unsupported stream filter for bounded recovery: {filter_name}")
+            # Use MuPDF's streaming decoders, reading at most the remaining
+            # allowance plus one sentinel byte (never xref_stream's unbounded
+            # materialization). Filters are composed in PDF decode order.
+            from pymupdf import mupdf
+
+            filters = re.findall(r"/[A-Za-z0-9]+", filter_name)
+            supported = {"/ASCIIHexDecode", "/ASCII85Decode", "/FlateDecode", "/LZWDecode"}
+            if not filters or any(f not in supported for f in filters):
+                raise ValueError(f"Unsupported stream filter for bounded recovery: {filter_name}")
+            params_kind, params = doc.xref_get_key(xref, "DecodeParms")
+            if params_kind not in ("null", "dict"):
+                raise ValueError("Unsupported filter DecodeParms array")
+            if params_kind == "dict" and re.search(r"/Predictor\s+(?!1\b)\d+", params):
+                raise ValueError("Unsupported stream predictor")
+            early = re.search(r"/EarlyChange\s+([01])", params)
+            backing = mupdf.fz_new_buffer_from_copied_data(raw)
+            chain = mupdf.fz_open_buffer(backing)
+            try:
+                for name in filters:
+                    if name == "/ASCIIHexDecode":
+                        chain = mupdf.fz_open_ahxd(chain)
+                    elif name == "/ASCII85Decode":
+                        chain = mupdf.fz_open_a85d(chain)
+                    elif name == "/FlateDecode":
+                        chain = mupdf.fz_open_flated(chain, 15)
+                    else:
+                        chain = mupdf.fz_open_lzwd(chain, int(early[1]) if early else 1, 9, 0, 0)
+                limit = decode_limit
+                output = bytearray()
+                while len(output) <= limit:
+                    chunk = bytearray(min(65536, limit + 1 - len(output)))
+                    count = mupdf.fz_read(
+                        chain, mupdf.python_mutable_buffer_data(chunk), len(chunk)
+                    )
+                    if not count:
+                        break
+                    output.extend(chunk[:count])
+                data = bytes(output)
+            except Exception as exc:
+                raise ValueError("Malformed compressed PDF stream") from exc
         if len(data) > MAX_STREAM_BYTES:
             raise RecoveryBudgetError("Decoded stream byte budget exceeded")
-        self.decoded += len(data)
+        if font_program:
+            digest = hashlib.sha256(data).hexdigest()
+            if digest in self.font_programs:
+                data = self.font_programs[digest]
+            else:
+                self.font_programs[digest] = data
+                self.decoded += len(data)
+        else:
+            self.decoded += len(data)
         if self.decoded > MAX_TOTAL_BYTES:
             raise RecoveryBudgetError("Total decoded byte budget exceeded")
         self.streams[xref] = data
@@ -257,48 +313,67 @@ def _candidate(doc: Any, xref: int, budget: _Budget) -> bool:
         and doc.xref_get_key(descendant, "Subtype")[1] == "/CIDFontType2"
         and doc.xref_is_stream(truetype)
     ):
-        return _is_telugu_font(budget.stream(doc, truetype))
+        return _is_telugu_font(budget.stream(doc, truetype, font_program=True))
     if (
         opentype
         and doc.xref_get_key(opentype, "Subtype")[1] == "/OpenType"
         and doc.xref_is_stream(opentype)
     ):
-        return _is_telugu_font(budget.stream(doc, opentype))
+        return _is_telugu_font(budget.stream(doc, opentype, font_program=True))
     return False
 
 
-def find_glyph_id_fonts(pdf_path: str | Path) -> list[GlyphIdFont]:
-    """Find Telugu-verified Identity-H/V fonts lacking ToUnicode.
+def _font_program_ref(doc: Any, xref: int) -> int:
+    descriptor = _reference(doc, _descendant(doc, xref), "FontDescriptor")
+    return _reference(doc, descriptor, "FontFile2") or _reference(doc, descriptor, "FontFile3")
 
-    fontTools is required for verification; HarfBuzz is not used. Pages are
-    1-indexed and contain nonempty text operands using the font, including Forms.
-    Unsupported content is conservatively excluded from automatic detection.
+
+def find_glyph_id_fonts(pdf_path: str | Path, *, strict_fonts: bool = False) -> list[GlyphIdFont]:
+    """Inspect used Identity fonts only; count distinct verified program hashes.
+
+    Automatic detection excludes unsupported/undecodable programs. Explicit
+    recovery reports their font names. Content execution retains hard budgets.
     """
     found: dict[int, GlyphIdFont] = {}
     verdicts: dict[int, bool] = {}
+    hashes: set[str] = set()
     budget = _Budget()
     with fitz.open(pdf_path) as doc:
         for page in doc:
-            names = {}
-            for xref, _, _, name, *_ in page.get_fonts(full=True):
-                if xref not in verdicts:
-                    verdicts[xref] = _candidate(doc, xref, budget)
-                    if sum(verdicts.values()) > MAX_CANDIDATE_FONTS:
-                        raise RecoveryBudgetError("Candidate font budget exceeded")
-                if verdicts[xref]:
-                    names[xref] = name
+            names = {
+                xref: name
+                for xref, _, _, name, *_ in page.get_fonts(full=True)
+                if doc.xref_get_key(xref, "Subtype")[1] == "/Type0"
+                and doc.xref_get_key(xref, "Encoding")[1] in ("/Identity-H", "/Identity-V")
+                and doc.xref_get_key(xref, "ToUnicode")[0] == "null"
+            }
             if not names:
                 continue
+            used: set[int] = set()
             try:
-                runs = _raw_runs(page, set(names), budget=budget, discovery=True)
+                _raw_runs(page, set(), budget=budget, discovery=True, _used_fonts=used)
             except RecoveryBudgetError:
                 raise
             except ValueError:
                 continue
-            used = {xref for group in runs.values() for xref, _ in group}
-            for xref in sorted(used):
-                font = found.setdefault(xref, GlyphIdFont(xref, names[xref], []))
-                font.pages.append(page.number + 1)
+            for xref in sorted(used & names.keys()):
+                if xref not in verdicts:
+                    try:
+                        verdicts[xref] = _candidate(doc, xref, budget)
+                    except (ValueError, RuntimeError) as exc:
+                        if strict_fonts:
+                            raise ValueError(
+                                f"Cannot decode font {names[xref]} (xref {xref}): {exc}"
+                            ) from exc
+                        verdicts[xref] = False
+                    if verdicts[xref]:
+                        data = budget.stream(doc, _font_program_ref(doc, xref), font_program=True)
+                        hashes.add(hashlib.sha256(data).hexdigest())
+                        if len(hashes) > MAX_CANDIDATE_FONTS:
+                            raise RecoveryBudgetError("Candidate font budget exceeded")
+                if verdicts[xref]:
+                    font = found.setdefault(xref, GlyphIdFont(xref, names[xref], []))
+                    font.pages.append(page.number + 1)
     return list(found.values())
 
 
@@ -528,6 +603,7 @@ class DecodeResult:
     unknown_count: int
     total_glyphs: int
     warnings: list[dict[str, Any]] = field(default_factory=list)
+    clusters: list[tuple[int, int, str]] = field(default_factory=list)
 
 
 def _extend_conjunct(
@@ -579,6 +655,7 @@ def _decode_glyph_stream(
     """Greedy longest exact GID match; every unknown GID yields one U+FFFD."""
     values = tuple(gids)
     text = []
+    clusters = []
     unknown = 0
     warnings: list[dict[str, Any]] = []
     pos = 0
@@ -599,13 +676,15 @@ def _decode_glyph_stream(
                             }
                         )
                 text.append(match)
+                clusters.append((pos, pos + length, match))
                 pos += length
                 break
         else:
             text.append(REPLACEMENT)
+            clusters.append((pos, pos + 1, REPLACEMENT))
             unknown += 1
             pos += 1
-    return DecodeResult("".join(text), unknown, len(values), warnings)
+    return DecodeResult("".join(text), unknown, len(values), warnings, clusters)
 
 
 @dataclass
@@ -617,12 +696,13 @@ class RoundtripReport:
     establish correct reading order across runs or correctness of inferred text.
     """
 
-    match_ratio: float
+    match_ratio: float | None
     matching_glyphs: int
     compared_glyphs: int
     mismatching_spans: list[dict[str, Any]]
     well_formedness_ratio: float
     well_formedness_issues: list[dict[str, Any]]
+    verification_complete: bool = True
 
 
 def _well_formedness(text: str) -> tuple[float, list[dict[str, Any]]]:
@@ -674,11 +754,12 @@ def verify_roundtrip(
         matched = len(original)
     else:
         work = len(original) * len(comparable)
+        remaining = MAX_ALIGNMENT_WORK - (_budget.alignment_work if _budget else 0)
+        if work > min(MAX_RUN_ALIGNMENT_WORK, remaining):
+            ratio, issues = _well_formedness(recovered_text)
+            return RoundtripReport(None, 0, 0, [], ratio, issues, verification_complete=False)
         if _budget is not None:
             _budget.alignment_work += work
-            work = _budget.alignment_work
-        if work > MAX_ALIGNMENT_WORK:
-            raise RecoveryBudgetError("Round-trip alignment work budget exceeded")
         matcher = SequenceMatcher(a=original, b=comparable, autojunk=False)
         matched = sum(block.size for block in matcher.get_matching_blocks())
         mismatches = [
@@ -796,18 +877,57 @@ def _tokens(data: bytes) -> list[Any]:
     return result
 
 
+def _cid_widths(doc: Any, xref: int, budget: _Budget) -> tuple[float, dict[int, float]]:
+    """PDF advances, not ink bounds, define geometric word gaps."""
+    child = _descendant(doc, xref)
+    kind, value = doc.xref_get_key(child, "DW")
+    default = float(value) if kind in ("int", "float") else 1000.0
+    kind, value = doc.xref_get_key(child, "W")
+    if kind == "null":
+        return default, {}
+    if kind == "xref":
+        value = doc.xref_object(int(value.split()[0]))
+    if len(value) > MAX_STREAM_BYTES:
+        raise RecoveryBudgetError("Font widths byte budget exceeded")
+    tokens = _tokens(value.encode())[1:-1]
+    widths: dict[int, float] = {}
+    i = 0
+    while i < len(tokens):
+        budget.operation()
+        first = int(tokens[i])
+        if tokens[i + 1] == "[":
+            i += 2
+            cid = first
+            while tokens[i] != "]":
+                budget.operation()
+                if not 0 <= cid <= 65535:
+                    raise ValueError("Invalid CID width index")
+                widths[cid] = float(tokens[i])
+                cid += 1
+                i += 1
+            i += 1
+        else:
+            last, width = int(tokens[i + 1]), float(tokens[i + 2])
+            if not 0 <= first <= last <= 65535:
+                raise ValueError("Invalid CID width range")
+            for cid in range(first, last + 1):
+                budget.operation()
+                widths[cid] = width
+            i += 3
+    return default, widths
+
+
 def _raw_runs(
     page: Any,
     candidates: set[int],
     *,
     budget: _Budget | None = None,
     discovery: bool = False,
-) -> dict[str, list[tuple[int, list[int]]]]:
+    _used_fonts: set[int] | None = None,
+) -> dict[str, list[tuple[int, list[int], list[float]]]]:
     """Read bounded raw runs; discovery visits each Form/resource context once.
 
-    TJ displacements are in thousandths of the font em. A negative adjustment
-    of at least 250 opens a >= 0.25 * font-size gap and splits a word. Positive
-    adjustments close gaps; smaller adjustments remain within the syllable.
+    Positioning syntax never determines word breaks; trace geometry does.
     """
     budget = budget or _Budget()
     doc = page.parent
@@ -819,12 +939,13 @@ def _raw_runs(
     forms: dict[int, dict[str, int]] = {}
     for xref, name, owner, *_ in page.get_xobjects():
         forms.setdefault(owner, {})[name] = xref
-    runs: dict[str, list[tuple[int, list[int]]]] = {}
+    runs: dict[str, list[tuple[int, list[int], list[float]]]] = {}
     cid_maps = {}
+    widths = {xref: _cid_widths(doc, xref, budget) for xref in candidates}
     for xref in candidates:
         ref = _reference(doc, _descendant(doc, xref), "CIDToGIDMap")
         cid_maps[xref] = budget.stream(doc, ref) if ref else None
-    used: set[int] = set()
+    used: set[int] = _used_fonts if _used_fonts is not None else set()
     visited: set[tuple[Any, ...]] = set()
     numeric = re.compile(r"[+-]?(?:\d+\.?\d*|\.\d+)")
 
@@ -921,17 +1042,7 @@ def _raw_runs(
                 if mode in (3, 7):  # Invisible OCR and clipping-only are excluded.
                     args = []
                     continue
-                chunks = [bytearray()]
-                for arg in args:
-                    if isinstance(arg, bytes):
-                        chunks[-1].extend(arg)
-                    elif (
-                        token == "TJ"
-                        and numeric.fullmatch(arg)
-                        and float(arg) <= -250
-                        and chunks[-1]
-                    ):
-                        chunks.append(bytearray())
+                chunks = [b"".join(arg for arg in args if isinstance(arg, bytes))]
                 if any(chunks):
                     used.add(font_xref)
                 if font_xref in candidates:
@@ -948,7 +1059,10 @@ def _raw_runs(
                             else cids
                         )
                         if gids:
-                            runs.setdefault(names[font_xref], []).append((font_xref, gids))
+                            default, table = widths[font_xref]
+                            runs.setdefault(names[font_xref], []).append(
+                                (font_xref, gids, [table.get(c, default) / 1000 for c in cids])
+                            )
             args = []
         if args:
             raise ValueError("Trailing PDF operands without operator")
@@ -1003,7 +1117,7 @@ def _positioned_runs(
         while pos < len(chars):
             if index >= len(raw[name]):
                 raise ValueError("PDF raw text and MuPDF trace have different glyph counts")
-            xref, gids = raw[name][index]
+            xref, gids, widths = raw[name][index]
             count = min(len(chars) - pos, len(gids) - offset)
             segment = chars[pos : pos + count]
             values = gids[offset : offset + count]
@@ -1015,6 +1129,9 @@ def _positioned_runs(
                 {
                     "xref": xref,
                     "gids": values,
+                    "origins": [c[2][0] for c in segment],
+                    "widths": [w * span["size"] for w in widths[offset : offset + count]],
+                    "sizes": [span["size"]] * count,
                     "advances": [
                         (chars[pos + i + 1][2][0] - c[2][0])
                         if pos + i + 1 < len(chars)
@@ -1061,11 +1178,15 @@ def _lines(spans: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
 
 
 def recover_pdf(
-    pdf_path: str | Path, *, page_numbers: set[int] | None = None, strict_cmap: bool = False
+    pdf_path: str | Path,
+    *,
+    page_numbers: set[int] | None = None,
+    strict_cmap: bool = False,
+    convert_legacy: bool = False,
 ) -> RecoveryResult:
     """Recover visible text within aggregate budgets; disclose used cmap inference."""
     _dependencies()
-    candidates = find_glyph_id_fonts(pdf_path)
+    candidates = find_glyph_id_fonts(pdf_path, strict_fonts=True)
     if page_numbers is not None:
         candidates = [f for f in candidates if page_numbers.intersection(f.pages)]
     if not candidates:
@@ -1086,6 +1207,20 @@ def recover_pdf(
             spans = _positioned_runs(
                 page, {f.xref for f in candidates if page.number + 1 in f.pages}, budget
             )
+            if convert_legacy:
+                from legacylipi.core.encoding_detector import EncodingDetector
+                from legacylipi.core.unicode_converter import UnicodeConverter
+
+                detector, converter = EncodingDetector(), UnicodeConverter()
+                for span in spans:
+                    if not span["xref"]:
+                        match = detector.detect_from_text_block(
+                            TextBlock(raw_text=span["text"], font_name=span["font_name"])
+                        )
+                        if match.is_legacy:
+                            span["text"] = converter.convert_text(
+                                span["text"], match.detected_encoding
+                            ).converted_text
             lines = []
             for line in _lines(spans):
                 merged: list[dict[str, Any]] = []
@@ -1093,10 +1228,15 @@ def recover_pdf(
                     if (
                         merged
                         and merged[-1]["xref"] == span["xref"]
-                        and span["x"] - merged[-1]["end"] <= max(1, span["size"] * 0.15)
+                        and merged[-1]["font_name"] == span["font_name"]
+                        and (
+                            span["xref"]
+                            or span["x"] - merged[-1]["end"] <= span["size"] * WORD_GAP_EM
+                        )
                     ):
                         merged[-1]["gids"].extend(span["gids"])
-                        merged[-1].setdefault("advances", []).extend(span.get("advances", []))
+                        for key in ("advances", "origins", "widths", "sizes"):
+                            merged[-1].setdefault(key, []).extend(span.get(key, []))
                         merged[-1]["text"] += span["text"]
                         merged[-1]["end"] = max(merged[-1]["end"], span["end"])
                         box = merged[-1]["bbox"]
@@ -1110,24 +1250,31 @@ def recover_pdf(
                         merged.append(dict(span, gids=list(span["gids"])))
                 lines.append(merged)
             page_data.append((page.number + 1, page.rect.width, page.rect.height, lines))
-        # One map at a time. Reports retain diagnostics, never mapping tables.
+        # Group resources by program hash before map construction and traversal.
+        # One map per distinct used font, regardless of page/resource copies.
+        groups: dict[str, list[GlyphIdFont]] = {}
+        programs: dict[str, bytes] = {}
         for candidate in candidates:
-            descriptor = _reference(doc, _descendant(doc, candidate.xref), "FontDescriptor")
-            ref = _reference(doc, descriptor, "FontFile2") or _reference(
-                doc, descriptor, "FontFile3"
-            )
-            mapping = build_glyph_map(budget.stream(doc, ref))
+            data = budget.stream(doc, _font_program_ref(doc, candidate.xref), font_program=True)
+            digest = hashlib.sha256(data).hexdigest()
+            groups.setdefault(digest, []).append(candidate)
+            programs[digest] = data
+        for digest, group in groups.items():
+            candidate = group[0]
+            font_xrefs = {f.xref for f in group}
+            mapping = build_glyph_map(programs[digest])
             inferred_entries = {
                 r["codepoint"] for r in mapping.cmap_repairs if r["source"].startswith("inferred")
             }
             for _number, _, _, lines in page_data:
                 for line in lines:
                     for span in line:
-                        if span["xref"] != candidate.xref:
+                        if span["xref"] not in font_xrefs:
                             continue
-                        decoded = decode_glyph_stream(
-                            span["gids"], mapping, advances=span.get("advances")
-                        )
+                        origins = span["origins"]
+                        advances = [b - a for a, b in zip(origins, origins[1:], strict=False)]
+                        advances.append(span["widths"][-1])
+                        decoded = decode_glyph_stream(span["gids"], mapping, advances=advances)
                         used = {f"U+{ord(c):04X}" for c in decoded.text} & inferred_entries
                         if used and strict_cmap:
                             raise ValueError(
@@ -1135,9 +1282,26 @@ def recover_pdf(
                             )
                         inferred.update(used)
                         warnings.extend(decoded.warnings)
-                        span["text"] = decoded.text
+                        cluster_parts = []
+                        for start, _end, text in decoded.clusters:
+                            if (
+                                start
+                                and cluster_parts
+                                and not cluster_parts[-1].endswith(" ")
+                                and not text.startswith(" ")
+                            ):
+                                gap = (
+                                    origins[start] - origins[start - 1] - span["widths"][start - 1]
+                                )
+                                size = span["sizes"][start]
+                                if gap > size * WORD_GAP_EM + 0.001:
+                                    cluster_parts.append(
+                                        "\t" if gap > size * COLUMN_GAP_EM else " "
+                                    )
+                            cluster_parts.append(text)
+                        span["text"] = "".join(cluster_parts)
                         span["metrics"] = {
-                            "font_xref": candidate.xref,
+                            "font_xref": span["xref"],
                             "x": span["x"],
                             "y": span["y"],
                             "total_glyphs": decoded.total_glyphs,
@@ -1151,6 +1315,8 @@ def recover_pdf(
             font_reports.append(
                 {
                     **asdict(candidate),
+                    "font_xrefs": sorted(font_xrefs),
+                    "pages": sorted({p for f in group for p in f.pages}),
                     "font_hash": mapping.font_hash,
                     "map_entries": len(mapping.mapping),
                     "estimated_map_bytes": mapping.estimated_bytes,
@@ -1189,8 +1355,8 @@ def recover_pdf(
                     and not text.startswith(" ")
                 ):
                     gap = span["x"] - previous["end"]
-                    if gap > max(1, span["size"] * 0.15):
-                        parts.append("\t" if gap > span["size"] * 2 else " ")
+                    if gap > span["size"] * WORD_GAP_EM + 0.001:
+                        parts.append("\t" if gap > span["size"] * COLUMN_GAP_EM else " ")
                 parts.append(text)
                 previous = span
                 if "metrics" in span:
@@ -1219,14 +1385,20 @@ def recover_pdf(
             for key in ("total_glyphs", "unknown_count", "matching_glyphs", "compared_glyphs")
         }
         ratio, issues = _well_formedness(page.unicode_text)
+        complete = all(r["verification_complete"] for r in runs)
         reports.append(
             {
                 "page": number,
                 **metrics,
                 "runs": runs,
-                "roundtrip_match_ratio": metrics["matching_glyphs"] / metrics["compared_glyphs"]
-                if metrics["compared_glyphs"]
-                else 1,
+                "verification_complete": complete,
+                "roundtrip_match_ratio": (
+                    metrics["matching_glyphs"] / metrics["compared_glyphs"]
+                    if metrics["compared_glyphs"]
+                    else 1
+                )
+                if complete
+                else None,
                 "well_formedness_ratio": ratio,
                 "well_formedness_issues": issues,
             }
@@ -1235,6 +1407,14 @@ def recover_pdf(
     total = sum(p["total_glyphs"] for p in reports)
     unknown = sum(p["unknown_count"] for p in reports)
     compared = sum(p["compared_glyphs"] for p in reports)
+    complete = all(p["verification_complete"] for p in reports)
+    if not complete:
+        warnings.append(
+            {
+                "code": "verification-incomplete",
+                "message": "Round-trip diagnostic budget exhausted; recovered text is retained, but verification is incomplete.",
+            }
+        )
     report = {
         "source": str(pdf_path),
         "script": "telugu",
@@ -1242,9 +1422,13 @@ def recover_pdf(
         "total_glyphs": total,
         "unknown_count": unknown,
         "glyph_coverage": 1 - unknown / total if total else 1,
-        "roundtrip_match_ratio": sum(p["matching_glyphs"] for p in reports) / compared
-        if compared
-        else 1,
+        "verification_complete": complete,
+        "alignment_work": budget.alignment_work,
+        "roundtrip_match_ratio": (
+            sum(p["matching_glyphs"] for p in reports) / compared if compared else 1
+        )
+        if complete
+        else None,
         "well_formedness_ratio": _well_formedness(text)[0],
         "collisions": sum(len(f["collisions"]) for f in font_reports),
         "inferred_cmap_entries": sum(
@@ -1278,7 +1462,9 @@ def recover_document(
     """
     if not page_numbers:
         return document
-    result = recover_pdf(document.filepath, page_numbers=page_numbers, strict_cmap=strict_cmap)
+    result = recover_pdf(
+        document.filepath, page_numbers=page_numbers, strict_cmap=strict_cmap, convert_legacy=True
+    )
     pages = {page.page_number: page for page in result.pages}
     return replace(
         document,
