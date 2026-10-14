@@ -1,7 +1,7 @@
-# LegacyLipi - Project Context
+# indic-legacy-pdf - Project Context
 
 ## Project Overview
-LegacyLipi is a PDF translator for legacy Indian font encodings (Marathi, Hindi, Tamil, etc.). It converts PDFs with legacy encodings to Unicode and translates them to various target languages.
+indic-legacy-pdf is a PDF translator for legacy Indian font encodings (Marathi, Hindi, Tamil, etc.). It converts PDFs with legacy encodings to Unicode and translates them to various target languages.
 
 ## Development Guidelines
 
@@ -48,7 +48,7 @@ Follow semantic versioning:
 
 ## Project Structure
 ```
-legacylipi/
+indic-legacy-pdf/
 ├── src/legacylipi/
 │   ├── core/                    # Core translation pipeline
 │   │   ├── models.py            # Data models (TextBlock, PDFPage, PDFDocument, etc.)
@@ -209,7 +209,7 @@ In the web UI, use the "Quick Actions" card:
 ## Running the Application
 
 ```bash
-cd legacylipi
+cd indic-legacy-pdf
 
 # React Web UI (FastAPI + React frontend)
 uv run legacylipi api                  # Production: serves built frontend on :8000

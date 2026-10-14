@@ -1,23 +1,41 @@
-> **legacylipi-telugu** is a derivative of [biswasbiplob/legacylipi](https://github.com/biswasbiplob/legacylipi) (MIT, see [NOTICE.md](NOTICE.md)).
-> It adds Telugu *glyph-ID* PDF text recovery (`legacylipi recover-text`; automatic detection as `glyph-id`) - see [docs/glyph-recovery.md](docs/glyph-recovery.md).
-> Status: independently reviewed over several rounds. Recovery that relies on inferred character mappings is reported with warnings and is **not** proof of original spelling. Legacy ASCII-mapped Telugu fonts (Priyaanka, Pallava, ...) are **not** supported yet.
+# indic-legacy-pdf
 
-# LegacyLipi
-
-**Legacy Font PDF Translator** - Translate PDF documents with legacy Indian font encodings to English.
+Recover Unicode text from Indic-language PDFs whose text layer is unreadable (legacy font encodings, missing glyph-to-Unicode maps), then translate or export it.
 
 ## Problem
 
-Millions of government documents, legal papers, and archival materials in Indian regional languages (Marathi, Hindi, Tamil, etc.) were created using legacy font encoding systems (Shree-Lipi, Kruti Dev, APS, Chanakya, etc.). These fonts map Devanagari/regional script glyphs to ASCII/Latin code points, making them unreadable by standard translation tools.
+- **A: Legacy fonts** map script glyphs to ASCII/Latin code points; for example, महाराष्ट्र राजभाषा अधिनियम extracts as `´ÖÆüÖ¸üÖÂ™Òü ¸üÖ•Ö³ÖÖÂÖÖ †×¬Ö×®ÖμÖ´Ö`.
+- **B: Missing ToUnicode maps** leave embedded Unicode fonts extracting as raw glyph IDs; embedded Telugu fonts are an example.
+- **C: Scanned/image PDFs** contain text as images and require OCR.
 
-**Example:**
-- What the PDF displays: महाराष्ट्र राजभाषा अधिनियम
-- What text extraction produces: `´ÖÆüÖ¸üÖÂ™Òü ¸üÖ•Ö³ÖÖÂÖÖ †×¬Ö×®ÖμÖ´Ö`
-- What Google Translate sees: Gibberish
+## What is supported today
+
+| Script | Language(s) | Mechanism | Status |
+|--------|-------------|-----------|--------|
+| Devanagari | Marathi, Hindi | A: legacy fonts: Shree-Lipi/Shree-Dev, DVB-TT, Kruti Dev, Chanakya, APS-DV, Walkman Chanakya, Shusha | Built-in |
+| Telugu | Telugu | B: glyph-ID recovery by reverse shaping (`recover-text`, auto-detected as `glyph-id`) | Implemented, optional `glyph` extra, independently reviewed, see [docs/glyph-recovery.md](docs/glyph-recovery.md) |
+| Telugu | Telugu | A: legacy ASCII fonts (Priyaanka only) | Research prototype, one font family, not part of the CLI, see [research/telugu-legacy-priyaanka/](research/telugu-legacy-priyaanka/) |
+| All scripts | any | C: OCR for scanned PDFs | EasyOCR/Tesseract; language availability depends on the OCR engine |
+
+## Roadmap
+
+**Planned (not implemented)**
+
+- More Devanagari legacy encodings.
+- Telugu legacy fonts beyond Priyaanka.
+- Kannada, Tamil, Malayalam, Bengali, Gujarati and other scripts, one at a time with tests.
+
+No dates; each script is added with tests and a documented limitations list.
+
+## Adding a language or encoding
+
+Follow [docs/development.md](docs/development.md#adding-a-new-encoding) and the
+[contribution steps](#contributing): use TDD, add tests for each mapping, and
+document limitations honestly.
 
 ## Solution
 
-LegacyLipi:
+indic-legacy-pdf:
 1. **Detects** the font encoding scheme used in a PDF (legacy or Unicode)
 2. **Converts** legacy-encoded text to proper Unicode
 3. **Alternatively**, uses **OCR** (Tesseract or EasyOCR) to extract text from scanned PDFs
@@ -26,29 +44,28 @@ LegacyLipi:
 
 ## Installation
 
-### From PyPI (Recommended)
+The Python package and the `legacylipi` command keep their current names for now.
+
+### From GitHub
+
+This repository is not published on PyPI under this name; the PyPI package called
+`legacylipi` is a different project.
 
 ```bash
-pip install legacylipi
+pip install "git+https://github.com/harinaralasetty/indic-legacy-pdf.git"
 ```
 
-Or with uv (one command, no install):
+With the optional glyph recovery dependencies:
 
 ```bash
-uvx legacylipi api
-```
-
-Or install as a tool:
-
-```bash
-uv tool install legacylipi
+pip install "legacylipi[glyph] @ git+https://github.com/harinaralasetty/indic-legacy-pdf.git"
 ```
 
 ### From Source
 
 ```bash
-git clone https://github.com/biswasbiplob/legacylipi.git
-cd legacylipi
+git clone https://github.com/harinaralasetty/indic-legacy-pdf.git
+cd indic-legacy-pdf
 uv sync
 ```
 
@@ -169,7 +186,7 @@ pipeline and is not safe to rely on for anything important.
 
 ## Web UI
 
-LegacyLipi includes a modern React-based web interface backed by a FastAPI REST API.
+indic-legacy-pdf includes a modern React-based web interface backed by a FastAPI REST API.
 
 ### Production (single command)
 
@@ -270,7 +287,7 @@ See [docs/cli-reference.md](docs/cli-reference.md) for full command reference.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                              LegacyLipi                                 │
+│                           indic-legacy-pdf                              │
 ├─────────────────────┬───────────────────────────────────────────────────┤
 │   React Frontend    │                  FastAPI Backend                   │
 │  (Vite + TS + TW)   │                                                   │
@@ -304,7 +321,11 @@ See [docs/development.md](docs/development.md) for setup instructions, running t
 
 ## License
 
-MIT
+License: MIT (see NOTICE.md).
+
+## Acknowledgements
+
+This project began as a fork of legacylipi by Biplob Biswas (https://github.com/biswasbiplob/legacylipi, MIT). The legacy-font encodings listed as built-in, the CLI/API/web UI scaffolding and the translation backends come from that work; the glyph-ID recovery and everything marked as research here were added in this repository.
 
 ## Contributing
 

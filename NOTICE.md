@@ -1,19 +1,21 @@
 # Notice and attribution
 
-This repository is a derivative of **legacylipi** by Biplob Biswas
-(<https://github.com/biswasbiplob/legacylipi>), which declares the MIT license in its
-`pyproject.toml`. The original project's code, structure and history are preserved here,
-and credit for that work belongs to its author.
+This repository originated as a fork of **legacylipi** by Biplob Biswas
+(<https://github.com/biswasbiplob/legacylipi>), licensed under MIT as declared in its
+`pyproject.toml`; upstream ships no separate LICENSE file. Credit for the inherited
+code remains with the original author.
 
-Additions in this repository (by Hari Naralasetty, with AI-assisted implementation that was
-independently reviewed and tested):
+Additions in this repository by Hari Naralasetty:
 
 - Telugu "glyph-ID" PDF text recovery by reverse shaping (`legacylipi recover-text`,
   automatic detection as `glyph-id`, integration into translate/convert/extract and the API)
 - Related tests, documentation and optional `glyph` dependency extra
+- Priyaanka Telugu legacy-font research in `research/telugu-legacy-priyaanka/`
 
-Test fixtures: `tests/fixtures/NotoSansTelugu-Regular.ttf` is licensed under the SIL Open
-Font License 1.1 (see `tests/fixtures/OFL-NotoSansTelugu.txt`).
+Test fixtures licensed under the SIL Open Font License 1.1:
+
+- `tests/fixtures/NotoSansTelugu-Regular.ttf` (see `tests/fixtures/OFL-NotoSansTelugu.txt`)
+- `tests/fixtures/NotoSerifTelugu-Regular.ttf` (see `tests/fixtures/OFL-NotoSerifTelugu.txt`)
 
 The MIT license text applies to the combined work:
 

@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "legacylipi"
 version = "1.1.0"
-description = "Legacy Font PDF Translator - Translate PDFs with legacy Indian font encodings to English"
+description = "Recover Unicode text from Indic PDFs with legacy or broken text layers (legacy font encodings, glyph-ID recovery) and translate them"
 readme = "README.md"
 license = "MIT"
 authors = [
@@ -72,10 +72,10 @@ legacylipi = "legacylipi.cli:main"
 legacylipi-web = "legacylipi.api.main:serve"
 
 [project.urls]
-Homepage = "https://github.com/biswasbiplob/legacylipi"
-Documentation = "https://github.com/biswasbiplob/legacylipi#readme"
-Repository = "https://github.com/biswasbiplob/legacylipi"
-Issues = "https://github.com/biswasbiplob/legacylipi/issues"
+Homepage = "https://github.com/harinaralasetty/indic-legacy-pdf"
+Documentation = "https://github.com/harinaralasetty/indic-legacy-pdf/#readme"
+Repository = "https://github.com/harinaralasetty/indic-legacy-pdf"
+Issues = "https://github.com/harinaralasetty/indic-legacy-pdf/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/legacylipi"]
