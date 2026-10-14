@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Dry run (skip release creation and PyPI publish)"
+        description: "Dry run (skip release creation)"
         type: boolean
         default: true
 
@@ -203,16 +203,18 @@ jobs:
           ### Installation
 
           \`\`\`bash
-          pip install legacylipi==${VERSION}
-          uv tool install legacylipi==${VERSION}
-          uvx legacylipi api
+          pip install "git+https://github.com/${{ github.repository }}.git@v${VERSION}"
+          uv tool install "git+https://github.com/${{ github.repository }}.git@v${VERSION}"
+          uvx --from "git+https://github.com/${{ github.repository }}.git@v${VERSION}" legacylipi api
           \`\`\`
+
+          This project is not published on PyPI; the PyPI package named \`legacylipi\` is a different project.
           EOF
 
       - name: Preview release notes (dry run)
         if: steps.check_release.outputs.exists == 'false' && inputs.dry_run == true
         run: |
-          echo "::notice::DRY RUN — skipping release creation and PyPI publish"
+          echo "::notice::DRY RUN — skipping release creation"
           echo "--- Generated release notes ---"
           cat release_notes.md
 
@@ -226,12 +228,6 @@ jobs:
             --notes-file release_notes.md
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish to PyPI
-        if: steps.check_release.outputs.exists == 'false' && inputs.dry_run != true
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
 
       - name: Skip release (already exists)
         if: steps.check_release.outputs.exists == 'true'

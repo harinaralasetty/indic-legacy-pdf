@@ -193,8 +193,8 @@ indic-legacy-pdf includes a modern React-based web interface backed by a FastAPI
 ```bash
 # Serves the built React frontend + API on one port
 legacylipi api
-# or
-uvx legacylipi api
+# or, without installing first
+uvx --from "git+https://github.com/harinaralasetty/indic-legacy-pdf.git" legacylipi api
 ```
 
 Open **http://localhost:8000** in your browser.
@@ -264,7 +264,7 @@ Both OCR engines are included as core dependencies:
 | Tesseract | Local, free, most language packs | CPU only |
 | Google Vision | Cloud, paid, best accuracy | N/A |
 
-Google Vision requires an additional install: `pip install legacylipi[vision]`
+Google Vision requires an additional install: `pip install "legacylipi[vision] @ git+https://github.com/harinaralasetty/indic-legacy-pdf.git"`
 
 See [docs/cli-reference.md](docs/cli-reference.md) for detailed OCR options and language codes.
 
