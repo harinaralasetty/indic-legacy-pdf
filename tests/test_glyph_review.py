@@ -503,3 +503,86 @@ def test_r10_aggregate_alignment_budget(monkeypatch):
     assert report.verification_complete is False
     assert report.match_ratio is None
     assert budget.alignment_work == cost
+
+
+def dense_glyph_pdf(path, page_count):
+    from tests.glyph_ground_truth import ground_truth_pdf
+
+    line = ("నిష్కృపత్వం పల్లవి మృత్స్నా ప్రత్యుత్పత్తి " * 2).strip()
+    source = path.with_name("dense-source.pdf")
+    layouts = ground_truth_pdf(source, [line] * 44, FONT.read_bytes(), "Tm")
+    assert sum(len(layout.gids) for layout in layouts) == 2596
+    with fitz.open(source) as original, fitz.open() as doc:
+        doc.insert_pdf(original)
+        for _ in range(page_count - 1):
+            doc.fullcopy_page(0)
+        doc.save(path, deflate=True)
+    return line
+
+
+@pytest.mark.parametrize("page_count", [3, pytest.param(200, marks=pytest.mark.slow)])
+def test_r10_dense_document_recovery(tmp_path, monkeypatch, page_count):
+    if page_count == 3:
+        monkeypatch.setattr(gr, "MAX_OPERATIONS_PER_PAGE", 30_000)
+        monkeypatch.setattr(gr, "MAX_OPERATIONS", 90_000)
+    pdf = tmp_path / "dense.pdf"
+    line = dense_glyph_pdf(pdf, page_count)
+    document = parse_pdf(pdf)
+    overall, pages = EncodingDetector().detect_from_document(document)
+    assert overall.detected_encoding == "glyph-id"
+    assert set(pages) == set(range(1, page_count + 1))
+    converted = UnicodeConverter().convert_with_recovery(document, overall, pages)
+    assert len(converted.pages) == page_count
+    assert all(page.unicode_text.splitlines() == [line] * 44 for page in converted.pages)
+
+
+@pytest.mark.parametrize("command", ["extract", "convert", "translate"])
+@pytest.mark.parametrize("encoding", ["Identity-H", "Identity-V"])
+def test_r10_automatic_recovery_budget_error(tmp_path, monkeypatch, command, encoding):
+    pdf = make_pdf(tmp_path / "budget.pdf", lines=["తెలుగు"])
+    with fitz.open(pdf) as doc:
+        doc.xref_set_key(5, "Encoding", "/" + encoding)
+        doc.saveIncr()
+    monkeypatch.setattr(gr, "MAX_OPERATIONS", 2)
+    original = gr._raw_runs
+    scans = []
+
+    def counted(*args, **kwargs):
+        scans.append(1)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(gr, "_raw_runs", counted)
+    args = [command, str(pdf), "-o", str(tmp_path / "out.txt")]
+    if command == "translate":
+        args += ["--translator", "mock"]
+    result = CliRunner().invoke(main, args)
+    assert result.exit_code != 0 and "Content operation budget exceeded" in result.output
+    assert "Traceback" not in result.output
+    assert len(scans) == 1  # The fallback inspects resources, never content streams.
+
+
+def test_r10_close_text_objects_reverse_paint(tmp_path):
+    from tests.glyph_ground_truth import ground_truth_pdf
+
+    pdf = tmp_path / "reverse.pdf"
+    ground_truth_pdf(pdf, ["కి చి"], FONT.read_bytes(), "words")
+    with fitz.open(pdf) as doc:
+        content = doc.xref_stream(4)
+        objects = [block + b"ET" for block in content.split(b"ET") if block.strip()]
+        assert len(objects) == 2
+        baseline = doc[0].get_pixmap().samples
+        doc.update_stream(4, b"\n".join(reversed(objects)))
+        assert doc[0].get_pixmap().samples == baseline
+        doc.saveIncr()
+    assert gr.recover_pdf(pdf).text.strip() == "కి చి"
+
+
+@pytest.mark.parametrize("separator", ["\u200d", "\u200c", "\u2060", " "])
+def test_r10_joiner_after_vowel_is_not_space(tmp_path, separator):
+    from tests.glyph_ground_truth import ground_truth_pdf
+
+    pdf = tmp_path / "joiner.pdf"
+    ground_truth_pdf(pdf, ["ప్రత్యు" + separator + "త్పత్తి"], FONT.read_bytes(), "TJ")
+    result = gr.recover_pdf(pdf)
+    assert result.text.strip() == ("ప్రత్యు త్పత్తి" if separator == " " else "ప్రత్యుత్పత్తి")
+    assert any(w["code"] == "ambiguous-joiner" for w in result.warnings) == (separator != " ")

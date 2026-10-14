@@ -91,7 +91,8 @@ SIGN_NAMES = dict(
 _CACHE: dict[tuple[str, str], GlyphMap] = {}
 CACHE_LIMIT = 1
 _CACHE_LOCK = threading.RLock()
-MAX_OPERATIONS = 2_000_000
+MAX_OPERATIONS_PER_PAGE = 2_000_000
+MAX_OPERATIONS = 20_000_000
 MAX_FORM_EXPANSIONS = 4096
 MAX_STREAM_BYTES = 16 * 1024 * 1024
 MAX_TOTAL_BYTES = 64 * 1024 * 1024
@@ -110,6 +111,7 @@ class RecoveryBudgetError(ValueError):
 
 @dataclass
 class _Budget:
+    page_count: int = 1
     operations: int = 0
     expansions: int = 0
     decoded: int = 0
@@ -201,7 +203,7 @@ class _Budget:
 
     def operation(self) -> None:
         self.operations += 1
-        if self.operations > MAX_OPERATIONS:
+        if self.operations > min(MAX_OPERATIONS_PER_PAGE * self.page_count, MAX_OPERATIONS):
             raise RecoveryBudgetError("Content operation budget exceeded")
 
     def expand(self) -> None:
@@ -338,6 +340,24 @@ def _font_program_ref(doc: Any, xref: int) -> int:
     return _reference(doc, descriptor, "FontFile2") or _reference(doc, descriptor, "FontFile3")
 
 
+def has_glyph_id_font_resources(pdf_path: str | Path) -> bool:
+    """Check font resources only; never execute or decode content streams."""
+    seen: set[int] = set()
+    budget = _Budget()
+    with fitz.open(pdf_path) as doc:
+        for page in doc:
+            for xref, *_ in page.get_fonts(full=True):
+                if xref in seen:
+                    continue
+                seen.add(xref)
+                try:
+                    if _candidate(doc, xref, budget):
+                        return True
+                except (ValueError, RuntimeError):
+                    continue
+    return False
+
+
 def find_glyph_id_fonts(pdf_path: str | Path, *, strict_fonts: bool = False) -> list[GlyphIdFont]:
     """Inspect used Identity fonts only; count distinct verified program hashes.
 
@@ -347,8 +367,8 @@ def find_glyph_id_fonts(pdf_path: str | Path, *, strict_fonts: bool = False) -> 
     found: dict[int, GlyphIdFont] = {}
     verdicts: dict[int, bool] = {}
     hashes: set[str] = set()
-    budget = _Budget()
     with fitz.open(pdf_path) as doc:
+        budget = _Budget(page_count=doc.page_count)
         for page in doc:
             names = {
                 xref: name
@@ -674,17 +694,19 @@ def _decode_glyph_stream(
             match = glyph_map.mapping.get(values[pos : pos + length])
             if match is not None:
                 match, length = _extend_conjunct(values, pos, match, length, glyph_map)
-                if match == " " and text and text[-1].endswith(VIRAMA):
+                if match == " " and (
+                    (advances is not None and abs(advances[pos]) < 0.01)
+                    or (advances is None and text and text[-1].endswith(VIRAMA))
+                ):
                     # Default ignorables can alias the space GID. Without an
                     # observable positive advance, do not invent a word boundary.
-                    if advances is None or abs(advances[pos]) < 0.01:
-                        match = ""
-                        warnings.append(
-                            {
-                                "code": "ambiguous-joiner",
-                                "message": "Space GID after virama may be ZWJ/ZWNJ; kept joiner-less text.",
-                            }
-                        )
+                    match = ""
+                    warnings.append(
+                        {
+                            "code": "ambiguous-joiner",
+                            "message": "Space GID with no observed advance may be a zero-width joiner; kept joiner-less text.",
+                        }
+                    )
                 text.append(match)
                 clusters.append((pos, pos + length, match))
                 pos += length
@@ -959,6 +981,7 @@ def _cid_widths(doc: Any, xref: int, budget: _Budget) -> tuple[float, dict[int, 
 
 @dataclass
 class _TextState:
+    text_object: int = 0
     font_xref: int = 0
     mode: int = 0
     font_size: float = 0
@@ -970,7 +993,7 @@ class _TextState:
 
 
 # Width, tracking and em size in page coordinates for each painted glyph.
-_RawRun = tuple[int, list[int], list[float], list[float], list[float]]
+_RawRun = tuple[int, list[int], list[float], list[float], list[float], int]
 
 
 def _raw_runs(
@@ -1016,6 +1039,7 @@ def _raw_runs(
     used: set[int] = _used_fonts if _used_fonts is not None else set()
     visited: set[tuple[Any, ...]] = set()
     numeric = re.compile(r"[+-]?(?:\d+\.?\d*|\.\d+)")
+    text_object = 0
 
     def visit(
         data: bytes,
@@ -1024,6 +1048,7 @@ def _raw_runs(
         active: tuple[int, ...],
         state: _TextState | None = None,
     ) -> None:
+        nonlocal text_object
         if len(active) > 32:
             raise RecoveryBudgetError("Form nesting budget exceeded")
         state = state or _TextState()
@@ -1084,6 +1109,8 @@ def _raw_runs(
             elif token == "Tz":
                 state.horizontal_scale = float(args[0]) / 100
             elif token == "BT":
+                text_object += 1
+                state.text_object = text_object
                 state.matrix = fitz.Matrix(1, 1)
             elif token == "Tm":
                 state.matrix = fitz.Matrix(*(float(a) for a in args))
@@ -1097,9 +1124,10 @@ def _raw_runs(
                 stack.append(replace(state))
             elif token == "Q":
                 # Text matrices are not part of the saved graphics state.
-                matrix = state.matrix
+                matrix, object_id = state.matrix, state.text_object
                 state = stack.pop() if stack else _TextState()
                 state.matrix = matrix
+                state.text_object = object_id
             elif token == "Do":
                 target = forms.get(owner, {}).get(args[0][1:])
                 if target:
@@ -1172,6 +1200,7 @@ def _raw_runs(
                                     ],
                                     [state.char_spacing * scale] * len(cids),
                                     [em] * len(cids),
+                                    state.text_object,
                                 )
                             )
             args = []
@@ -1228,7 +1257,7 @@ def _positioned_runs(
         while pos < len(chars):
             if index >= len(raw[name]):
                 raise ValueError("PDF raw text and MuPDF trace have different glyph counts")
-            xref, gids, widths, tracking, sizes = raw[name][index]
+            xref, gids, widths, tracking, sizes, text_object = raw[name][index]
             count = min(len(chars) - pos, len(gids) - offset)
             segment = chars[pos : pos + count]
             values = gids[offset : offset + count]
@@ -1239,6 +1268,7 @@ def _positioned_runs(
             spans.append(
                 {
                     "xref": xref,
+                    "text_object": text_object,
                     "gids": values,
                     "origins": [c[2][0] for c in segment],
                     "widths": widths[offset : offset + count],
@@ -1287,6 +1317,7 @@ def _lines(spans: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
         previous = runs[-1][-1] if runs else None
         if (
             previous is not None
+            and span.get("text_object") == previous.get("text_object")
             and span["xref"] == previous["xref"]
             and span["font_name"] == previous["font_name"]
             and abs(span["y"] - previous["y"]) <= max(2, span["size"] * 0.3)
@@ -1356,8 +1387,8 @@ def recover_pdf(
     inferred: set[str] = set()
     font_reports = []
     page_data = []
-    budget = _Budget()
     with fitz.open(pdf_path) as doc:
+        budget = _Budget(page_count=doc.page_count)
         # Validate all expanded content before asking MuPDF for trace positions.
         # In particular this refuses exponential paint graphs before rendering.
         for page in doc:

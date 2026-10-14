@@ -260,7 +260,7 @@ Default hard recovery budgets (controlled `ValueError`, usually `RecoveryBudgetE
 
 | Resource | Limit |
 |---|---:|
-| Content tokens/operators, aggregate per traversal | 2,000,000 |
+| Content tokens/operators, aggregate per traversal | 2,000,000 × page count, capped at 20,000,000 |
 | Form/page expansions per traversal | 4,096 |
 | Form nesting | 32 |
 | Decoded bytes per stream | 16 MiB |
@@ -303,7 +303,8 @@ The review tests use frozen golden outputs and generated fixtures, not a local
 `main` ref. Large generated-document checks are marked `slow` and skipped when
 `CI` is set; unit complexity checks use deterministic operation/expansion counts.
 
-Speculative detection treats content-budget exhaustion as inconclusive, logs a
-warning and retains ordinary detection. Explicit recovery still returns the
-controlled budget error. Malformed CID `DW`, `W`, `DescendantFonts` and
+On discovery budget exhaustion, a resource-only check for an embedded,
+Telugu-verified Identity-H/V font without ToUnicode propagates the controlled
+budget error if present; otherwise ordinary detection continues. Explicit
+recovery still returns the budget error. Malformed CID `DW`, `W`, `DescendantFonts` and
 `CIDToGIDMap` structures are rejected with descriptive errors.

@@ -434,11 +434,19 @@ class EncodingDetector:
         """
         overall, pages = self._detect_ordinary_document(document)
         if document.filepath.is_file():
-            from legacylipi.core.glyph_recovery import find_glyph_id_fonts
+            from legacylipi.core.glyph_recovery import (
+                RecoveryBudgetError,
+                find_glyph_id_fonts,
+                has_glyph_id_font_resources,
+            )
 
             try:
                 candidates = find_glyph_id_fonts(document.filepath)
             except (ValueError, RuntimeError) as exc:
+                if isinstance(exc, RecoveryBudgetError) and has_glyph_id_font_resources(
+                    document.filepath
+                ):
+                    raise
                 logger.warning("Glyph discovery inconclusive; using ordinary detection: %s", exc)
                 candidates = []
             affected = {page for font in candidates for page in font.pages}

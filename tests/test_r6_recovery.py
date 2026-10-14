@@ -11,12 +11,11 @@ from legacylipi.core.pdf_parser import parse_pdf
 from tests.glyph_helpers import make_pdf
 
 
-def test_unused_identity_font_budget_is_inconclusive(tmp_path, caplog):
-    pdf = make_pdf(tmp_path / "ordinary.pdf", lines=[])
+def test_unused_identity_font_budget_is_inconclusive(tmp_path, caplog, monkeypatch):
+    pdf = make_pdf(tmp_path / "ordinary.pdf", lines=[], embedded=False)
+    monkeypatch.setattr(gr, "MAX_OPERATIONS", 20)
     with fitz.open(pdf) as doc:
-        doc.update_stream(
-            4, b"q Q\n" * 1_000_001 + b"BT /F3 12 Tf 40 700 Td (Hello ordinary Latin) Tj ET"
-        )
+        doc.update_stream(4, b"q Q\n" * 11 + b"BT /F3 12 Tf 40 700 Td (Hello ordinary Latin) Tj ET")
         doc.saveIncr()
     document = parse_pdf(pdf)
     assert "Hello ordinary Latin" in document.raw_text
